@@ -1,0 +1,116 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Create an APFS volume in the container
+  community.general.diskutil:
+    state: present
+    container: "{{ diskutil_test_container }}"
+    volume_name: "{{ diskutil_test_apfs_volume }}"
+    quota: 100m
+  become: true
+  register: diskutil_test_apfs_create
+
+- name: Assert that the new volume got a device identifier
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs_create is changed
+      - diskutil_test_apfs_create.volume_device is match('^disk[0-9]+s[0-9]+$')
+    fail_msg: "The module did not report a device identifier for the new APFS volume"
+
+- name: Remember the device identifier of the new volume
+  ansible.builtin.set_fact:
+    diskutil_test_apfs_device: "{{ diskutil_test_apfs_create.volume_device }}"
+
+- name: Creating the same APFS volume again is a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: present
+      container: "{{ diskutil_test_container }}"
+      volume_name: "{{ diskutil_test_apfs_volume }}"
+    diskutil_test_expect_changed: false
+
+- name: Look up the existing APFS volume
+  community.general.diskutil:
+    state: present
+    container: "{{ diskutil_test_container }}"
+    volume_name: "{{ diskutil_test_apfs_volume }}"
+  become: true
+  register: diskutil_test_apfs_lookup
+
+- name: Assert that the existing volume was found
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs_lookup is not changed
+      - diskutil_test_apfs_lookup.volume_device == diskutil_test_apfs_device
+
+- name: Get the information of the new volume
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_apfs_device }}"
+  become: true
+  register: diskutil_test_apfs_info
+
+- name: Assert the information of the new volume
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs_info.volume_name == diskutil_test_apfs_volume
+      - diskutil_test_apfs_info.filesystem == 'APFS'
+      - diskutil_test_apfs_info.container_reference == diskutil_test_container
+
+- name: Renaming the volume is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: present
+      device: "{{ diskutil_test_apfs_device }}"
+      volume_name: "{{ diskutil_test_renamed_volume }}"
+    diskutil_test_expect_changed: true
+
+- name: Get the information of the renamed volume
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_apfs_device }}"
+  become: true
+  register: diskutil_test_apfs_renamed_info
+
+- name: Assert that the volume was renamed
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs_renamed_info.volume_name == diskutil_test_renamed_volume
+
+- name: Removing the volume is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: absent
+      container: "{{ diskutil_test_container }}"
+      volume_name: "{{ diskutil_test_renamed_volume }}"
+    diskutil_test_expect_changed: true
+
+- name: Removing the volume again is a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: absent
+      container: "{{ diskutil_test_container }}"
+      volume_name: "{{ diskutil_test_renamed_volume }}"
+    diskutil_test_expect_changed: false
+
+- name: List the APFS containers to confirm that the volume is gone
+  community.general.diskutil:
+    info_type: apfs
+  become: true
+  register: diskutil_test_apfs_after_delete
+
+- name: Assert that the volume is no longer part of its container
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs_device not in
+        (diskutil_test_apfs_after_delete.containers
+         | selectattr('reference', 'equalto', diskutil_test_container) | first).volumes
+        | map(attribute='device_identifier') | list
+    fail_msg: >-
+      {{ diskutil_test_apfs_device }} is still part of {{ diskutil_test_container }}:
+      {{ diskutil_test_apfs_after_delete.containers }}

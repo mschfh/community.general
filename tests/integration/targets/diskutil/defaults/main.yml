@@ -1,0 +1,13 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# The tests work on a throwaway sparse disk image, so they never touch a real disk of the host.
+diskutil_test_image_size: 512m
+diskutil_test_image: "/tmp/diskutil-test-{{ ansible_pid }}.dmg"
+diskutil_test_apfs_volume: DiskutilTestData
+diskutil_test_renamed_volume: DiskutilTestRenamed
+diskutil_test_mount_volume: DiskutilTestMount
+diskutil_test_scratch_volume: DiskutilTestScratch
+diskutil_test_mount_point: "/tmp/diskutil-test-mount-{{ ansible_pid }}"
+diskutil_test_other_mount_point: "/tmp/diskutil-test-mount-other-{{ ansible_pid }}"

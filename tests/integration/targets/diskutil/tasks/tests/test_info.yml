@@ -1,0 +1,113 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: List all disks
+  community.general.diskutil:
+    info_type: disks
+  register: diskutil_test_disks
+
+- name: Assert that the attached disk image is part of the disk list
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_disks is not changed
+      - diskutil_test_disks.whole_disks is sequence
+      - diskutil_test_disk in diskutil_test_disks.whole_disks
+      - diskutil_test_container in (diskutil_test_disks.partitions | map(attribute='device_identifier') | list)
+    fail_msg: >-
+      {{ diskutil_test_disk }} is not in {{ diskutil_test_disks.whole_disks }},
+      and {{ diskutil_test_container }} is not in
+      {{ diskutil_test_disks.partitions | map(attribute='device_identifier') | list }}
+
+- name: Get the information of the APFS container
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_container }}"
+  register: diskutil_test_container_info
+
+- name: Assert the information of the APFS container
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_container_info is not changed
+      - diskutil_test_container_info.device == diskutil_test_container
+      - diskutil_test_container_info.filesystem == 'APFS'
+      - diskutil_test_container_info.whole_disk == false
+      - diskutil_test_container_info.volume_is_mounted
+
+- name: Get the information of the APFS container by its device node
+  community.general.diskutil:
+    info_type: device
+    device: "/dev/{{ diskutil_test_container }}"
+  register: diskutil_test_container_node_info
+
+- name: Assert that the device node resolves to the same device
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_container_node_info.device == diskutil_test_container
+
+- name: List all APFS containers
+  community.general.diskutil:
+    info_type: apfs
+  register: diskutil_test_apfs
+
+- name: Assert that our APFS container is listed
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_apfs is not changed
+      - diskutil_test_apfs.containers | map(attribute='reference') | list | length >= 1
+      - diskutil_test_container in (diskutil_test_apfs.containers | map(attribute='reference') | list)
+
+- name: List all APFS volume groups
+  community.general.diskutil:
+    info_type: volume_groups
+  register: diskutil_test_volume_groups
+
+- name: Assert that the APFS volume groups are a list
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_volume_groups is not changed
+      - diskutil_test_volume_groups.volume_groups is sequence
+      - diskutil_test_volume_groups.volume_groups | length >= 0
+
+- name: List all file systems
+  community.general.diskutil:
+    info_type: filesystems
+  register: diskutil_test_filesystems
+
+- name: Assert that APFS is a known file system
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_filesystems is not changed
+      - "'APFS' in diskutil_test_filesystems.filesystems"
+
+- name: Get the mount information of the APFS container
+  community.general.diskutil:
+    info_type: mountinfo
+    device: "{{ diskutil_test_container }}"
+  register: diskutil_test_mount_info
+
+- name: Assert that the mount information was queried
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_mount_info is not changed
+      - diskutil_test_mount_info.mount_info.MountedVolume | default(true)
+
+- name: Run all read-only queries in check mode
+  community.general.diskutil:
+    info_type: "{{ diskutil_test_info_type }}"
+    device: "{{ diskutil_test_container }}"
+  check_mode: true
+  loop:
+    - disks
+    - device
+    - apfs
+    - volume_groups
+    - filesystems
+    - mountinfo
+  register: diskutil_test_check_mode
+
+- name: Assert that check mode never reports a change
+  ansible.builtin.assert:
+    that:
+      - not (diskutil_test_check_mode.results | map(attribute='changed') | select('truthy') | list | length > 0)
+    fail_msg: "A read-only query reported a change in check mode"

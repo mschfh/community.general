@@ -1,0 +1,14 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- block:
+    - ansible.builtin.import_tasks: setup.yml
+
+    - ansible.builtin.import_tasks: tests/test_info.yml
+    - ansible.builtin.import_tasks: tests/test_apfs_volume.yml
+    - ansible.builtin.import_tasks: tests/test_mount.yml
+    - ansible.builtin.import_tasks: tests/test_ownership.yml
+    - ansible.builtin.import_tasks: tests/test_erase.yml
+  always:
+    - ansible.builtin.import_tasks: teardown.yml

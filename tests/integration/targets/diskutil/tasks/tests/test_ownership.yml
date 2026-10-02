@@ -1,0 +1,53 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Enabling ownership on the APFS container is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: owned
+      device: "{{ diskutil_test_container }}"
+    diskutil_test_expect_changed: false
+
+- name: Disabling ownership is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: unowned
+      device: "{{ diskutil_test_container }}"
+    diskutil_test_expect_changed: true
+
+- name: Get the information of the APFS container
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_container }}"
+  become: true
+  register: diskutil_test_ownership_info
+
+- name: Assert that ownership is disabled
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_ownership_info.ownership_disabled
+      - "'Enabled' not in diskutil_test_ownership_info.owners"
+
+- name: Enabling ownership again is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: owned
+      device: "{{ diskutil_test_container }}"
+    diskutil_test_expect_changed: true
+
+- name: Get the information of the APFS container again
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_container }}"
+  become: true
+  register: diskutil_test_ownership_info_enabled
+
+- name: Assert that ownership is enabled again
+  ansible.builtin.assert:
+    that:
+      - not diskutil_test_ownership_info_enabled.ownership_disabled
+      - "'Enabled' in diskutil_test_ownership_info_enabled.owners"

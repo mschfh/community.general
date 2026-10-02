@@ -1,0 +1,69 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Try to erase a volume without confirming it
+  community.general.diskutil:
+    state: erased
+    device: "{{ diskutil_test_container }}"
+    volume_name: "{{ diskutil_test_scratch_volume }}"
+  become: true
+  register: diskutil_test_erase_unconfirmed
+  ignore_errors: true
+
+- name: Assert that erasing without confirmation is refused
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_erase_unconfirmed is failed
+      - "'erase_confirm' in diskutil_test_erase_unconfirmed.msg"
+    fail_msg: "The module did not refuse to erase a volume without 'erase_confirm'"
+
+- name: Erasing the volume of our throwaway container is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: erased
+      device: "{{ diskutil_test_container }}"
+      volume_name: "{{ diskutil_test_scratch_volume }}"
+      filesystem: APFS
+      erase_confirm: true
+    diskutil_test_expect_changed: true
+
+- name: Get the information of the erased volume
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_container }}"
+  become: true
+  register: diskutil_test_erase_info
+
+- name: Assert that the volume was erased
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_erase_info.volume_name == diskutil_test_scratch_volume
+      - diskutil_test_erase_info.filesystem == 'APFS'
+
+- name: Erasing the whole disk is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: erased
+      device: "{{ diskutil_test_disk }}"
+      volume_name: "{{ diskutil_test_scratch_volume }}"
+      filesystem: APFS
+      erase_scope: disk
+      partition_scheme: GPT
+      erase_confirm: true
+    diskutil_test_expect_changed: true
+
+- name: Erasing the whole disk again is a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: erased
+      device: "{{ diskutil_test_disk }}"
+      volume_name: "{{ diskutil_test_scratch_volume }}"
+      filesystem: APFS
+      erase_scope: disk
+      partition_scheme: GPT
+      erase_confirm: true
+    diskutil_test_expect_changed: false

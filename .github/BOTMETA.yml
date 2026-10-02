@@ -569,6 +569,11 @@ files:
     maintainers: ramondelafuente
   $modules/discord.py:
     maintainers: cwollinger
+  $modules/diskutil.py:
+    keywords: apfs darwin disk diskutil macos macosx osx volume
+    labels: diskutil macos
+    maintainers: $team_macos
+    ignore: mschfh
   $modules/django_check.py:
     maintainers: russoz
   $modules/django_command.py:

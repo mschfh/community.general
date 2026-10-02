@@ -1,0 +1,108 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Create an APFS volume that can be mounted and unmounted
+  community.general.diskutil:
+    state: present
+    container: "{{ diskutil_test_container }}"
+    volume_name: "{{ diskutil_test_mount_volume }}"
+  become: true
+  register: diskutil_test_mount_create
+
+- name: Remember the device identifier of the new volume
+  ansible.builtin.set_fact:
+    diskutil_test_mount_device: "{{ diskutil_test_mount_create.volume_device }}"
+
+- name: Get the information of the new volume
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_mount_device }}"
+  become: true
+  register: diskutil_test_mount_info_created
+
+- name: Assert that a new volume is mounted automatically
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_mount_info_created.volume_is_mounted
+
+- name: Unmounting the volume is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: unmounted
+      device: "{{ diskutil_test_mount_device }}"
+    diskutil_test_expect_changed: true
+
+- name: Assert that the volume is not mounted anymore
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_mount_device }}"
+  become: true
+  register: diskutil_test_mount_info_unmounted
+
+- name: Assert that the volume is unmounted
+  ansible.builtin.assert:
+    that:
+      - not diskutil_test_mount_info_unmounted.volume_is_mounted
+
+- name: Mounting the volume at a custom mount point is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: mounted
+      device: "{{ diskutil_test_mount_device }}"
+      mount_point: "{{ diskutil_test_mount_point }}"
+    diskutil_test_expect_changed: true
+
+- name: Get the mount information of the volume
+  community.general.diskutil:
+    info_type: mountinfo
+    device: "{{ diskutil_test_mount_device }}"
+  become: true
+  register: diskutil_test_mount_info_custom
+
+- name: Assert the mount point of the volume
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_mount_info_custom.mount_info.MountPoint == diskutil_test_mount_point
+
+- name: Moving the volume to another mount point is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: mounted
+      device: "{{ diskutil_test_mount_device }}"
+      mount_point: "{{ diskutil_test_other_mount_point }}"
+    diskutil_test_expect_changed: true
+
+- name: Get the information of the volume at its new mount point
+  community.general.diskutil:
+    info_type: device
+    device: "{{ diskutil_test_mount_device }}"
+  become: true
+  register: diskutil_test_mount_info_moved
+
+- name: Assert that the volume was moved
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_mount_info_moved.volume_is_mounted
+      - diskutil_test_mount_info_moved.mount_point == diskutil_test_other_mount_point
+
+- name: Unmounting the volume again is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: unmounted
+      device: "{{ diskutil_test_mount_device }}"
+      force: true
+    diskutil_test_expect_changed: true
+
+- name: Removing the volume we mounted is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: absent
+      container: "{{ diskutil_test_container }}"
+      volume_name: "{{ diskutil_test_mount_volume }}"
+    diskutil_test_expect_changed: true

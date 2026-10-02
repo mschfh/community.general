@@ -1,0 +1,47 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Helper that applies a community.general.diskutil task and verifies that it is idempotent.
+# Expects the module arguments in `diskutil_test_params`, and whether the first run is expected
+# to report a change in `diskutil_test_expect_changed` (defaults to false).
+
+- name: Check whether the task would change anything
+  community.general.diskutil: "{{ diskutil_test_params }}"
+  become: true
+  check_mode: true
+  register: diskutil_test_check_run
+
+- name: Assert that check mode predicts the change correctly
+  ansible.builtin.assert:
+    that:
+      - (diskutil_test_check_run is changed) == (diskutil_test_expect_changed | bool)
+    fail_msg: >-
+      Check mode of {{ diskutil_test_params }} reported changed={{ diskutil_test_check_run is changed }},
+      but changed={{ diskutil_test_expect_changed | bool }} was expected
+
+- name: Apply the change
+  community.general.diskutil: "{{ diskutil_test_params }}"
+  become: true
+  register: diskutil_test_first_run
+
+- name: Assert that the first run reports the expected change
+  ansible.builtin.assert:
+    that:
+      - (diskutil_test_first_run is changed) == (diskutil_test_expect_changed | bool)
+    fail_msg: >-
+      The first run of {{ diskutil_test_params }} reported changed={{ diskutil_test_first_run is changed }},
+      but changed={{ diskutil_test_expect_changed | bool }} was expected
+
+- name: Apply the same change again
+  community.general.diskutil: "{{ diskutil_test_params }}"
+  become: true
+  register: diskutil_test_second_run
+
+- name: Assert that the second run does not report a change
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_second_run is not changed
+    fail_msg: >-
+      {{ diskutil_test_params }} is not idempotent:
+      {{ diskutil_test_second_run }} still reports a change

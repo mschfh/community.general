@@ -1,0 +1,46 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Create a sparse APFS disk image
+  ansible.builtin.command:
+    cmd: "hdiutil create -size {{ diskutil_test_image_size }} -type SPARSE -fs APFS {{ diskutil_test_image }}"
+  become: true
+  changed_when: true
+  register: diskutil_test_create
+
+- name: Attach the disk image without mounting it
+  ansible.builtin.command:
+    cmd: "hdiutil attach -nomount {{ diskutil_test_image }}"
+  become: true
+  changed_when: true
+  register: diskutil_test_attach
+
+- name: Determine the devices of the attached disk image
+  ansible.builtin.set_fact:
+    # `hdiutil attach` prints the whole disk first, followed by one line per partition.
+    diskutil_test_disk_node: "{{ diskutil_test_attach.stdout_lines[0].split()[0] }}"
+    diskutil_test_disk: "{{ diskutil_test_attach.stdout_lines[0].split()[0] | basename }}"
+    diskutil_test_container: "{{ (diskutil_test_attach.stdout_lines | select('search', 'Apple_APFS') | first).split()[0] | basename }}"
+
+- name: Verify that the disk image was attached
+  ansible.builtin.assert:
+    that:
+      - diskutil_test_create.rc == 0
+      - diskutil_test_attach.rc == 0
+      - diskutil_test_disk is match('^disk[0-9]+$')
+      - diskutil_test_container is match('^disk[0-9]+s[0-9]+$')
+    fail_msg: >-
+      hdiutil did not report a whole disk and an APFS volume:
+      {{ diskutil_test_attach.stdout_lines }}
+    success_msg: "Using {{ diskutil_test_disk }} with the APFS container {{ diskutil_test_container }}"
+
+- name: Create the mount points used by the tests
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  become: true
+  loop:
+    - "{{ diskutil_test_mount_point }}"
+    - "{{ diskutil_test_other_mount_point }}"

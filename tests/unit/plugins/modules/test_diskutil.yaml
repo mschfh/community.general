@@ -1,0 +1,1272 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+anchors:
+  env: &env {check_rc: false}
+
+  # `diskutil info -plist` for the mounted APFS volume disk0s1.
+  info_mounted: &info_mounted |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>DeviceIdentifier</key><string>disk0s1</string>
+      <key>DeviceNode</key><string>/dev/disk0s1</string>
+      <key>WholeDisk</key><false/>
+      <key>VolumeName</key><string>data</string>
+      <key>VolumeUUID</key><string>11111111-2222-3333-4444-555555555555</string>
+      <key>Mounted</key><true/>
+      <key>MountPoint</key><string>/Volumes/data</string>
+      <key>WritableVolume</key><true/>
+      <key>FileSystemPersonality</key><string>APFS</string>
+      <key>Content</key><string>Apple_APFS</string>
+      <key>VolumeSize</key><integer>499963174912</integer>
+      <key>VolumeFreeSpace</key><integer>123456789012</integer>
+      <key>DiskSize</key><integer>500107862016</integer>
+      <key>BlockSize</key><integer>4096</integer>
+      <key>Internal</key><true/>
+      <key>Ejectable</key><false/>
+      <key>SolidState</key><true/>
+      <key>MediaType</key><string>NVM</string>
+      <key>Protocol</key><string>NVMe</string>
+      <key>Owners</key><array><string>Enabled</string></array>
+      <key>OwnersDisabled</key><false/>
+      <key>ContainerReference</key><string>disk0s1</string>
+      <key>APFSVolumeGroup</key><string>AAAAAAAA-1111-2222-3333-444455556666</string>
+      <key>APFSVolumeRole</key><string>Data</string>
+    </dict>
+    </plist>
+
+  # The same volume, but currently unmounted.
+  info_unmounted: &info_unmounted |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>DeviceIdentifier</key><string>disk0s1</string>
+      <key>DeviceNode</key><string>/dev/disk0s1</string>
+      <key>WholeDisk</key><false/>
+      <key>VolumeName</key><string>data</string>
+      <key>VolumeUUID</key><string>11111111-2222-3333-4444-555555555555</string>
+      <key>Mounted</key><false/>
+      <key>WritableVolume</key><true/>
+      <key>FileSystemPersonality</key><string>APFS</string>
+      <key>Content</key><string>Apple_APFS</string>
+      <key>VolumeSize</key><integer>499963174912</integer>
+      <key>VolumeFreeSpace</key><integer>123456789012</integer>
+      <key>DiskSize</key><integer>500107862016</integer>
+      <key>Internal</key><true/>
+      <key>Ejectable</key><false/>
+      <key>SolidState</key><true/>
+      <key>MediaType</key><string>NVM</string>
+      <key>Owners</key><array><string>Enabled</string></array>
+      <key>OwnersDisabled</key><false/>
+    </dict>
+    </plist>
+
+  # The same volume, but with ownership disabled.
+  info_ownership_disabled: &info_ownership_disabled |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>DeviceIdentifier</key><string>disk0s1</string>
+      <key>DeviceNode</key><string>/dev/disk0s1</string>
+      <key>VolumeName</key><string>data</string>
+      <key>Mounted</key><false/>
+      <key>FileSystemPersonality</key><string>APFS</string>
+      <key>Content</key><string>Apple_APFS</string>
+      <key>Owners</key><array><string>Disabled</string></array>
+      <key>OwnersDisabled</key><true/>
+    </dict>
+    </plist>
+
+  # The same volume, but formatted as HFS+.
+  info_hfs: &info_hfs |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>DeviceIdentifier</key><string>disk0s1</string>
+      <key>DeviceNode</key><string>/dev/disk0s1</string>
+      <key>VolumeName</key><string>Macintosh HD</string>
+      <key>Mounted</key><false/>
+      <key>FileSystemPersonality</key><string>HFS+</string>
+      <key>Content</key><string>Apple_HFS</string>
+      <key>Owners</key><array><string>Enabled</string></array>
+      <key>OwnersDisabled</key><false/>
+    </dict>
+    </plist>
+
+  # The same volume, but already erased to an APFS volume called Scratch.
+  info_apfs_scratch: &info_apfs_scratch |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>DeviceIdentifier</key><string>disk0s1</string>
+      <key>DeviceNode</key><string>/dev/disk0s1</string>
+      <key>VolumeName</key><string>Scratch</string>
+      <key>Mounted</key><false/>
+      <key>FileSystemPersonality</key><string>APFS</string>
+      <key>Content</key><string>Apple_APFS</string>
+      <key>Owners</key><array><string>Enabled</string></array>
+      <key>OwnersDisabled</key><false/>
+    </dict>
+    </plist>
+
+  # `diskutil list -plist`, showing one whole disk with one APFS volume.
+  list_disk0: &list_disk0 |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key>
+      <array><string>disk0</string><string>disk0s1</string></array>
+      <key>AllDisksAndPartitions</key>
+      <array><string>disk0</string><string>disk0s1</string></array>
+      <key>WholeDisks</key>
+      <array><string>disk0</string></array>
+      <key>Disks</key>
+      <array>
+        <dict>
+          <key>DeviceIdentifier</key><string>disk0</string>
+          <key>DeviceNode</key><string>/dev/disk0</string>
+          <key>Major</key><integer>259</integer>
+          <key>Minor</key><integer>0</integer>
+          <key>MediaName</key><string>APPLE SSD AP0256Z</string>
+          <key>MediaType</key><string>NVM</string>
+          <key>Protocol</key><string>NVMe</string>
+          <key>Internal</key><true/>
+          <key>SmartStatus</key><string>Verified</string>
+          <key>Size</key><integer>500107862016</integer>
+          <key>BlockSize</key><integer>512</integer>
+          <key>Ejectable</key><false/>
+          <key>RemovableMedia</key><false/>
+          <key>SolidState</key><true/>
+          <key>VirtualOrPhysical</key><string>Physical</string>
+          <key>PartitionMaps</key>
+          <array>
+            <dict>
+              <key>DeviceIdentifier</key><string>disk0s1</string>
+              <key>DeviceNode</key><string>/dev/disk0s1</string>
+              <key>Size</key><integer>500107753472</integer>
+              <key>BlockSize</key><integer>4096</integer>
+              <key>Content</key><string>Apple_APFS</string>
+              <key>FileSystemPersonality</key><string>APFS</string>
+              <key>VolumeUUID</key><string>11111111-2222-3333-4444-555555555555</string>
+              <key>VolumeName</key><string>Macintosh HD</string>
+              <key>MountPoint</key><string>/System/Volumes/Data</string>
+              <key>Mounted</key><true/>
+              <key>WritableVolume</key><true/>
+              <key>ReadOnlyVolume</key><false/>
+              <key>VolumeEncryptionEnabled</key><false/>
+              <key>APFSVolumeGroup</key><string>AAAAAAAA-1111-2222-3333-444455556666</string>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # `diskutil list -plist`, showing an external disk4 with one mounted volume.
+  list_disk4: &list_disk4 |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key>
+      <array><string>disk4</string><string>disk4s1</string></array>
+      <key>WholeDisks</key>
+      <array><string>disk4</string></array>
+      <key>Disks</key>
+      <array>
+        <dict>
+          <key>DeviceIdentifier</key><string>disk4</string>
+          <key>DeviceNode</key><string>/dev/disk4</string>
+          <key>MediaName</key><string>USB Flash Disk</string>
+          <key>MediaType</key><string>Generic</string>
+          <key>Protocol</key><string>USB</string>
+          <key>Internal</key><false/>
+          <key>Size</key><integer>100066306304</integer>
+          <key>BlockSize</key><integer>512</integer>
+          <key>Ejectable</key><true/>
+          <key>RemovableMedia</key><true/>
+          <key>SolidState</key><false/>
+          <key>VirtualOrPhysical</key><string>Physical</string>
+          <key>PartitionMaps</key>
+          <array>
+            <dict>
+              <key>DeviceIdentifier</key><string>disk4s1</string>
+              <key>DeviceNode</key><string>/dev/disk4s1</string>
+              <key>Size</key><integer>100065492992</integer>
+              <key>BlockSize</key><integer>4096</integer>
+              <key>Content</key><string>Apple_APFS</string>
+              <key>FileSystemPersonality</key><string>APFS</string>
+              <key>VolumeName</key><string>Backup</string>
+              <key>MountPoint</key><string>/Volumes/Backup</string>
+              <key>Mounted</key><true/>
+              <key>WritableVolume</key><true/>
+              <key>ReadOnlyVolume</key><false/>
+              <key>VolumeEncryptionEnabled</key><false/>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # `diskutil list -plist` without any disk, as after a disk has been ejected.
+  list_empty: &list_empty |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key><array/>
+      <key>AllDisksAndPartitions</key><array/>
+      <key>WholeDisks</key><array/>
+      <key>Disks</key><array/>
+    </dict>
+    </plist>
+
+  # `diskutil list -plist` for a disk4 that was already erased to an APFS volume called Data.
+  list_disk4_erased: &list_disk4_erased |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key>
+      <array><string>disk4</string><string>disk4s1</string><string>disk4s2</string></array>
+      <key>WholeDisks</key>
+      <array><string>disk4</string></array>
+      <key>Disks</key>
+      <array>
+        <dict>
+          <key>DeviceIdentifier</key><string>disk4</string>
+          <key>DeviceNode</key><string>/dev/disk4</string>
+          <key>MediaType</key><string>Generic</string>
+          <key>Protocol</key><string>USB</string>
+          <key>Internal</key><false/>
+          <key>Size</key><integer>100066306304</integer>
+          <key>Ejectable</key><true/>
+          <key>SolidState</key><false/>
+          <key>VirtualOrPhysical</key><string>Physical</string>
+          <key>PartitionMaps</key>
+          <array>
+            <dict>
+              <key>DeviceIdentifier</key><string>disk4s1</string>
+              <key>DeviceNode</key><string>/dev/disk4s1</string>
+              <key>Size</key><integer>20971520</integer>
+              <key>BlockSize</key><integer>4096</integer>
+              <key>Content</key><string>EFI</string>
+              <key>Mounted</key><false/>
+            </dict>
+            <dict>
+              <key>DeviceIdentifier</key><string>disk4s2</string>
+              <key>DeviceNode</key><string>/dev/disk4s2</string>
+              <key>Size</key><integer>100065402880</integer>
+              <key>BlockSize</key><integer>4096</integer>
+              <key>Content</key><string>Apple_APFS</string>
+              <key>FileSystemPersonality</key><string>APFS</string>
+              <key>VolumeName</key><string>Data</string>
+              <key>Mounted</key><false/>
+              <key>WritableVolume</key><true/>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # `diskutil apfs list -plist` for a container that already has a volume called Data.
+  apfs_with_data: &apfs_with_data |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key><array><string>disk0</string></array>
+      <key>AllAPFSContainers</key><array><string>disk0s1</string></array>
+      <key>APFSContainers</key>
+      <array>
+        <dict>
+          <key>APFSContainerReference</key><string>disk0s1</string>
+          <key>APFSContainerCapacity</key><integer>500107862016</integer>
+          <key>APFSContainerCapacityFree</key><integer>223456789012</integer>
+          <key>APFSPhysicalStores</key>
+          <array><dict><key>DeviceIdentifier</key><string>disk0</string></dict></array>
+          <key>APFSContainerVolumes</key>
+          <array>
+            <dict>
+              <key>APFSVolumeName</key><string>Macintosh HD</string>
+              <key>APFSVolumeUUID</key><string>11111111-2222-3333-4444-555555555555</string>
+              <key>APFSVolumeDeviceIdentifier</key><string>disk0s1</string>
+              <key>APFSVolumeCapacity</key><integer>500107753472</integer>
+              <key>APFSVolumeCapacityFree</key><integer>223456789012</integer>
+              <key>APFSVolumeRole</key><string>System</string>
+              <key>APFSVolumeIsSystem</key><true/>
+              <key>APFSVolumeIsBoot</key><true/>
+              <key>APFSVolumeIsEncrypted</key><false/>
+              <key>APFSVolumeIsFileVault</key><false/>
+              <key>APFSVolumeIsTimeMachine</key><false/>
+              <key>APFSVolumeGroup</key><string>AAAAAAAA-1111-2222-3333-444455556666</string>
+            </dict>
+            <dict>
+              <key>APFSVolumeName</key><string>Data</string>
+              <key>APFSVolumeUUID</key><string>99999999-8888-7777-6666-555555555555</string>
+              <key>APFSVolumeDeviceIdentifier</key><string>disk0s2</string>
+              <key>APFSVolumeCapacity</key><integer>100000000000</integer>
+              <key>APFSVolumeCapacityFree</key><integer>90000000000</integer>
+              <key>APFSVolumeIsSystem</key><false/>
+              <key>APFSVolumeIsBoot</key><false/>
+              <key>APFSVolumeIsEncrypted</key><false/>
+              <key>APFSVolumeIsFileVault</key><false/>
+              <key>APFSVolumeIsTimeMachine</key><false/>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # The same container, but without the volume called Data.
+  apfs_without_data: &apfs_without_data |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>AllDisks</key><array><string>disk0</string></array>
+      <key>AllAPFSContainers</key><array><string>disk0s1</string></array>
+      <key>APFSContainers</key>
+      <array>
+        <dict>
+          <key>APFSContainerReference</key><string>disk0s1</string>
+          <key>APFSContainerCapacity</key><integer>500107862016</integer>
+          <key>APFSContainerCapacityFree</key><integer>223456789012</integer>
+          <key>APFSPhysicalStores</key>
+          <array><dict><key>DeviceIdentifier</key><string>disk0</string></dict></array>
+          <key>APFSContainerVolumes</key>
+          <array>
+            <dict>
+              <key>APFSVolumeName</key><string>Macintosh HD</string>
+              <key>APFSVolumeUUID</key><string>11111111-2222-3333-4444-555555555555</string>
+              <key>APFSVolumeDeviceIdentifier</key><string>disk0s1</string>
+              <key>APFSVolumeCapacity</key><integer>500107753472</integer>
+              <key>APFSVolumeCapacityFree</key><integer>223456789012</integer>
+              <key>APFSVolumeRole</key><string>System</string>
+              <key>APFSVolumeIsSystem</key><true/>
+              <key>APFSVolumeIsBoot</key><true/>
+              <key>APFSVolumeIsEncrypted</key><false/>
+              <key>APFSVolumeIsFileVault</key><false/>
+              <key>APFSVolumeIsTimeMachine</key><false/>
+              <key>APFSVolumeGroup</key><string>AAAAAAAA-1111-2222-3333-444455556666</string>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # `diskutil apfs listVolumeGroups -plist`.
+  apfs_volume_groups: &apfs_volume_groups |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>APFSVolumeGroups</key>
+      <array>
+        <dict>
+          <key>APFSVolumeGroupUUID</key><string>AAAAAAAA-1111-2222-3333-444455556666</string>
+          <key>APFSVolumeGroupIdentifiers</key>
+          <array><string>disk0s1</string><string>disk0s2</string></array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+
+  # `diskutil mountinfo -plist` for a mounted volume.
+  mountinfo_mounted: &mountinfo_mounted |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>MountPoint</key><string>/Volumes/data</string>
+      <key>MountedVolume</key><true/>
+      <key>MountedWritableVolume</key><true/>
+      <key>SyntheticRoot</key><false/>
+    </dict>
+    </plist>
+
+  # The normalized disk0s1 partition, as returned by info_type=disks.
+  partition_disk0s1: &partition_disk0s1
+    device_identifier: disk0s1
+    device_node: /dev/disk0s1
+    name: Macintosh HD
+    volume_uuid: 11111111-2222-3333-4444-555555555555
+    content: Apple_APFS
+    filesystem: APFS
+    size: 500107753472
+    block_size: 4096
+    mounted: true
+    mount_point: /System/Volumes/Data
+    writable: true
+    read_only: false
+    encrypted: false
+    container_reference: null
+    apfs_group: AAAAAAAA-1111-2222-3333-444455556666
+    fusion_drive: null
+
+  # The normalized disk0, as returned by info_type=disks.
+  disk_disk0: &disk_disk0
+    device_identifier: disk0
+    device_node: /dev/disk0
+    media_name: APPLE SSD AP0256Z
+    media_type: NVM
+    protocol: NVMe
+    internal: true
+    ejectable: false
+    removable_media: false
+    solid_state: true
+    virtual_or_physical: Physical
+    size: 500107862016
+    block_size: 512
+    smart_status: Verified
+    partitions: [*partition_disk0s1]
+
+test_cases:
+  - id: test_missing_input
+    input: {}
+    output:
+      failed: true
+      msg: "one of the following is required: state, info_type"
+
+  - id: test_state_and_info_type_are_mutually_exclusive
+    input:
+      state: mounted
+      device: disk0s1
+      info_type: disks
+    output:
+      failed: true
+      msg: "parameters are mutually exclusive: state|info_type"
+
+  # -- read-only queries ------------------------------------------------------------
+
+  - id: test_info_disks
+    input:
+      info_type: disks
+    output:
+      changed: false
+      whole_disks: [disk0]
+      disks: [*disk_disk0]
+      partitions: [*partition_disk0s1]
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_disk0
+          err: ''
+
+  - id: test_info_device
+    input:
+      info_type: device
+      device: disk0s1
+    output:
+      changed: false
+      device: disk0s1
+      device_node: /dev/disk0s1
+      whole_disk: false
+      volume_name: data
+      volume_uuid: 11111111-2222-3333-4444-555555555555
+      volume_is_mounted: true
+      mount_point: /Volumes/data
+      filesystem: APFS
+      content: Apple_APFS
+      owners: [Enabled]
+      ownership_disabled: false
+      container_reference: disk0s1
+      apfs_role: Data
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+
+  - id: test_info_device_without_device
+    input:
+      info_type: device
+    output:
+      failed: true
+      msg: The 'device' option is required for this operation
+    mocks:
+      run_command: []
+
+  - id: test_info_apfs
+    input:
+      info_type: apfs
+    output:
+      changed: false
+      containers:
+        - reference: disk0s1
+          capacity: 500107862016
+          capacity_free: 223456789012
+          physical_stores: [disk0]
+          volumes:
+            - device_identifier: disk0s1
+              name: Macintosh HD
+              uuid: 11111111-2222-3333-4444-555555555555
+              capacity: 500107753472
+              capacity_free: 223456789012
+              role: System
+              encrypted: false
+              filevault: false
+              system: true
+              boot: true
+              time_machine: false
+              apfs_group: AAAAAAAA-1111-2222-3333-444455556666
+            - device_identifier: disk0s2
+              name: Data
+              uuid: 99999999-8888-7777-6666-555555555555
+              capacity: 100000000000
+              capacity_free: 90000000000
+              role: null
+              encrypted: false
+              filevault: false
+              system: false
+              boot: false
+              time_machine: false
+              apfs_group: null
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_info_volume_groups
+    input:
+      info_type: volume_groups
+    output:
+      changed: false
+      volume_groups:
+        - APFSVolumeGroupUUID: AAAAAAAA-1111-2222-3333-444455556666
+          APFSVolumeGroupIdentifiers: [disk0s1, disk0s2]
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, listVolumeGroups, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_volume_groups
+          err: ''
+
+  - id: test_info_filesystems
+    input:
+      info_type: filesystems
+    output:
+      changed: false
+      filesystems: [APFS, HFS, HFS+J, MS-DOS, ExFAT]
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, listFilesystems]
+          environ: *env
+          rc: 0
+          out: |
+            APFS
+            HFS
+            HFS+J
+            MS-DOS
+            ExFAT
+          err: ''
+
+  - id: test_info_mountinfo
+    input:
+      info_type: mountinfo
+      device: disk0s1
+    output:
+      changed: false
+      mount_info:
+        MountPoint: /Volumes/data
+        MountedVolume: true
+        MountedWritableVolume: true
+        SyntheticRoot: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, mountinfo, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *mountinfo_mounted
+          err: ''
+
+  # -- mount state ------------------------------------------------------------------
+
+  - id: test_mounted_noop
+    input:
+      state: mounted
+      device: disk0s1
+    output:
+      changed: false
+      volume_is_mounted: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+
+  - id: test_mounted_at_requested_mount_point
+    input:
+      state: mounted
+      device: disk0s1
+      mount_point: /Volumes/data
+    output:
+      changed: false
+      mount_point: /Volumes/data
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+
+  - id: test_mounted_without_mount_point
+    input:
+      state: mounted
+      device: disk0s1
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_unmounted
+          err: ''
+        - command: [/testbin/diskutil, mount, disk0s1]
+          environ: *env
+          rc: 0
+          out: /dev/disk0s1 mounted
+          err: ''
+
+  - id: test_mounted_at_new_mount_point
+    input:
+      state: mounted
+      device: disk0s1
+      mount_point: /Volumes/other
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, unmount, disk0s1]
+          environ: *env
+          rc: 0
+          out: Unmounting disk0s1
+          err: ''
+        - command: [/testbin/diskutil, mount, -mountPoint, /Volumes/other, disk0s1]
+          environ: *env
+          rc: 0
+          out: /dev/disk0s1 mounted
+          err: ''
+
+  - id: test_mounted_at_new_mount_point_check_mode
+    input:
+      state: mounted
+      device: disk0s1
+      mount_point: /Volumes/other
+    output:
+      changed: true
+    flags:
+      check: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+
+  - id: test_unmounted_noop
+    input:
+      state: unmounted
+      device: disk0s1
+    output:
+      changed: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_unmounted
+          err: ''
+
+  - id: test_unmounted
+    input:
+      state: unmounted
+      device: disk0s1
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, unmount, disk0s1]
+          environ: *env
+          rc: 0
+          out: Unmounting disk0s1
+          err: ''
+
+  - id: test_unmounted_force
+    input:
+      state: unmounted
+      device: disk0s1
+      force: true
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, unmount, -force, disk0s1]
+          environ: *env
+          rc: 0
+          out: Unmounting disk0s1
+          err: ''
+
+  - id: test_ejected
+    input:
+      state: ejected
+      device: disk4
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_disk4
+          err: ''
+        - command: [/testbin/diskutil, unmount, disk4s1]
+          environ: *env
+          rc: 0
+          out: Unmounting disk4s1
+          err: ''
+        - command: [/testbin/diskutil, eject, disk4]
+          environ: *env
+          rc: 0
+          out: "disk4 was already ejected\n"
+          err: ''
+
+  - id: test_ejected_noop
+    input:
+      state: ejected
+      device: disk4
+    output:
+      changed: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_empty
+          err: ''
+
+  # -- ownership --------------------------------------------------------------------
+
+  - id: test_owned_noop
+    input:
+      state: owned
+      device: disk0s1
+    output:
+      changed: false
+      owners: [Enabled]
+      ownership_disabled: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+
+  - id: test_owned
+    input:
+      state: owned
+      device: disk0s1
+    output:
+      changed: true
+      ownership_disabled: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_ownership_disabled
+          err: ''
+        - command: [/testbin/diskutil, enableOwnership, disk0s1]
+          environ: *env
+          rc: 0
+          out: Ownership of volume disk0s1 enabled
+          err: ''
+
+  - id: test_unowned
+    input:
+      state: unowned
+      device: disk0s1
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, disableOwnership, disk0s1]
+          environ: *env
+          rc: 0
+          out: Ownership of volume disk0s1 disabled
+          err: ''
+
+  # -- APFS volumes -----------------------------------------------------------------
+
+  - id: test_present_create
+    input:
+      state: present
+      container: disk0s1
+      volume_name: Data
+    output:
+      changed: true
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_without_data
+          err: ''
+        - command: [/testbin/diskutil, apfs, addVolume, disk0s1, APFS, Data]
+          environ: *env
+          rc: 0
+          out: Created volume disk0s2 with name "Data"
+          err: ''
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_present_create_with_quota_without_mount
+    input:
+      state: present
+      container: disk0s1
+      volume_name: Data
+      quota: 10g
+      reserve: 2g
+      mount_new_volume: false
+    output:
+      changed: true
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_without_data
+          err: ''
+        - command: [/testbin/diskutil, apfs, addVolume, disk0s1, APFS, Data, -quota, 10g, -reserve, 2g, -nomount]
+          environ: *env
+          rc: 0
+          out: Created volume disk0s2 with name "Data"
+          err: ''
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_present_create_check_mode
+    input:
+      state: present
+      container: disk0s1
+      volume_name: Data
+    output:
+      changed: true
+    flags:
+      check: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_without_data
+          err: ''
+
+  - id: test_present_noop
+    input:
+      state: present
+      container: disk0s1
+      volume_name: Data
+    output:
+      changed: false
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_present_rename
+    input:
+      state: present
+      device: disk0s2
+      volume_name: Work
+    output:
+      changed: true
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+        - command: [/testbin/diskutil, rename, disk0s2, Work]
+          environ: *env
+          rc: 0
+          out: Volume "Data" renamed to "Work"
+          err: ''
+
+  - id: test_present_rename_noop
+    input:
+      state: present
+      device: disk0s2
+      volume_name: Data
+    output:
+      changed: false
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_present_rename_check_mode
+    input:
+      state: present
+      device: disk0s2
+      volume_name: Work
+    output:
+      changed: true
+    flags:
+      check: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_present_without_container
+    input:
+      state: present
+      volume_name: Data
+    output:
+      failed: true
+      msg: The 'container' option is required for this operation
+    mocks:
+      run_command: []
+
+  - id: test_present_without_volume_name
+    input:
+      state: present
+      container: disk0s1
+    output:
+      failed: true
+      msg: The 'volume_name' option is required for this operation
+    mocks:
+      run_command: []
+
+  - id: test_present_with_unknown_device
+    input:
+      state: present
+      device: disk9
+      volume_name: Data
+    output:
+      failed: true
+      msg: >-
+        There is no APFS volume called 'disk9', therefore the 'container' option is required to create a
+        volume called 'Data'
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+
+  - id: test_absent
+    input:
+      state: absent
+      container: disk0s1
+      volume_name: Data
+    output:
+      changed: true
+      volume_device: disk0s2
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_with_data
+          err: ''
+        - command: [/testbin/diskutil, apfs, deleteVolume, disk0s2]
+          environ: *env
+          rc: 0
+          out: Deleted volume disk0s2
+          err: ''
+
+  - id: test_absent_noop
+    input:
+      state: absent
+      container: disk0s1
+      volume_name: Data
+    output:
+      changed: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, apfs, list, -plist]
+          environ: *env
+          rc: 0
+          out: *apfs_without_data
+          err: ''
+
+  - id: test_absent_without_options
+    input:
+      state: absent
+    output:
+      failed: true
+      msg: >-
+        Either the 'device' option, or both the 'container' and the 'volume_name' options are required when
+        state=absent
+    mocks:
+      run_command: []
+
+  # -- erase ------------------------------------------------------------------------
+
+  - id: test_erased_without_confirm
+    input:
+      state: erased
+      device: disk0s1
+      volume_name: Scratch
+    output:
+      failed: true
+      msg: >-
+        Erasing a disk or a volume cannot be undone, therefore the 'erase_confirm' option must be enabled to
+        run state=erased
+    mocks:
+      run_command: []
+
+  - id: test_erased_noop
+    input:
+      state: erased
+      device: disk0s1
+      volume_name: Scratch
+      erase_confirm: true
+    output:
+      changed: false
+      filesystem: APFS
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_apfs_scratch
+          err: ''
+
+  - id: test_erased
+    input:
+      state: erased
+      device: disk0s1
+      volume_name: Scratch
+      erase_confirm: true
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_hfs
+          err: ''
+        - command: [/testbin/diskutil, eraseVolume, APFS, Scratch, disk0s1]
+          environ: *env
+          rc: 0
+          out: Erasing disk0s1 (mounted = NO)
+          err: ''
+
+  - id: test_erased_without_volume_name
+    input:
+      state: erased
+      device: disk0s1
+      erase_confirm: true
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_hfs
+          err: ''
+        - command: [/testbin/diskutil, eraseVolume, APFS, Macintosh HD, disk0s1]
+          environ: *env
+          rc: 0
+          out: Erasing disk0s1 (mounted = NO)
+          err: ''
+
+  - id: test_erased_disk
+    input:
+      state: erased
+      device: disk4
+      volume_name: Data
+      filesystem: APFS
+      erase_scope: disk
+      partition_scheme: GPT
+      erase_confirm: true
+    output:
+      changed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_disk4
+          err: ''
+        - command: [/testbin/diskutil, eraseDisk, APFS, Data, disk4, GPT]
+          environ: *env
+          rc: 0
+          out: Erasing disk4
+          err: ''
+
+  - id: test_erased_disk_noop
+    input:
+      state: erased
+      device: disk4
+      volume_name: Data
+      filesystem: APFS
+      erase_scope: disk
+      partition_scheme: GPT
+      erase_confirm: true
+    output:
+      changed: false
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_disk4_erased
+          err: ''
+
+  - id: test_erased_disk_check_mode
+    input:
+      state: erased
+      device: disk4
+      volume_name: Data
+      erase_scope: disk
+      erase_confirm: true
+    output:
+      changed: true
+    flags:
+      check: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, list, -plist]
+          environ: *env
+          rc: 0
+          out: *list_disk4
+          err: ''
+
+  # -- diff mode and error paths -----------------------------------------------------
+
+  - id: test_diff_mode
+    input:
+      state: unmounted
+      device: disk0s1
+    output:
+      changed: true
+      volume_is_mounted: true
+    flags:
+      diff: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_mounted
+          err: ''
+        - command: [/testbin/diskutil, unmount, disk0s1]
+          environ: *env
+          rc: 0
+          out: Unmounting disk0s1
+          err: ''
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: *info_unmounted
+          err: ''
+
+  - id: test_command_failure
+    input:
+      state: mounted
+      device: disk9
+    output:
+      failed: true
+      msg: "Failed to run 'diskutil info': Could not find disk with identifier disk9"
+      rc: 1
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk9, -plist]
+          environ: *env
+          rc: 1
+          out: ''
+          err: Could not find disk with identifier disk9
+
+  - id: test_invalid_plist_output
+    input:
+      state: mounted
+      device: disk0s1
+    output:
+      failed: true
+    mocks:
+      run_command:
+        - command: [/testbin/diskutil, info, disk0s1, -plist]
+          environ: *env
+          rc: 0
+          out: "this is not a property list\n"
+          err: ''

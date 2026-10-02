@@ -1,0 +1,33 @@
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+- name: Detach the disk image
+  ansible.builtin.command:
+    cmd: "hdiutil detach -force {{ diskutil_test_disk_node }}"
+  become: true
+  changed_when: false
+  register: diskutil_test_detach
+  when: diskutil_test_disk_node is defined
+
+- name: Show the output of detaching the disk image
+  ansible.builtin.debug:
+    msg: "{{ diskutil_test_detach.stdout_lines | default([]) }}"
+  when: diskutil_test_disk_node is defined
+
+- name: Detach the disk image by its file as a fallback
+  ansible.builtin.command:
+    cmd: "hdiutil detach -force {{ diskutil_test_image }}"
+  become: true
+  changed_when: false
+  when: diskutil_test_detach is not defined or diskutil_test_detach.rc != 0
+
+- name: Remove the disk image
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  become: true
+  loop:
+    - "{{ diskutil_test_image }}"
+    - "{{ diskutil_test_mount_point }}"
+    - "{{ diskutil_test_other_mount_point }}"
