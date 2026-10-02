@@ -4,10 +4,10 @@
 
 # The tests work on a throwaway sparse disk image, so they never touch a real disk of the host.
 diskutil_test_image_size: 512m
-diskutil_test_image: "/tmp/diskutil-test-{{ ansible_pid }}.dmg"
+diskutil_test_image: "/tmp/diskutil-test-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}.dmg"
 diskutil_test_apfs_volume: DiskutilTestData
 diskutil_test_renamed_volume: DiskutilTestRenamed
 diskutil_test_mount_volume: DiskutilTestMount
 diskutil_test_scratch_volume: DiskutilTestScratch
-diskutil_test_mount_point: "/tmp/diskutil-test-mount-{{ ansible_pid }}"
-diskutil_test_other_mount_point: "/tmp/diskutil-test-mount-other-{{ ansible_pid }}"
+diskutil_test_mount_point: "/tmp/diskutil-test-mount-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"
+diskutil_test_other_mount_point: "/tmp/diskutil-test-mount-other-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"

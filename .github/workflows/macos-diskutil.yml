@@ -142,17 +142,20 @@ jobs:
       - name: Run the unit tests of the new module
         id: units
         continue-on-error: true
+        shell: bash
         run: |
+          set -o pipefail
           ansible-test units --color no \
             tests/unit/plugins/modules/test_diskutil.py \
-            --requirements \
             --python-interpreter "$(command -v python)" -v 2>&1 | tee /tmp/units.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Run the integration tests of the new module
         id: integration
         continue-on-error: true
+        shell: bash
         run: |
+          set -o pipefail
           ansible-test integration --color no \
             diskutil \
             --allow-root \
@@ -176,6 +179,14 @@ jobs:
           fi
           if ! grep -q "PLAY RECAP" /tmp/integration.log; then
             echo "::error::The integration tests did not run any play"
+            status=1
+          fi
+          if grep -qE "[0-9]+ failed|[0-9]+ error" /tmp/units.log; then
+            echo "::error::The unit tests reported failures"
+            status=1
+          fi
+          if grep -qE "failed=[1-9]|unreachable=[1-9]" /tmp/integration.log; then
+            echo "::error::The integration tests reported failures"
             status=1
           fi
           exit $status

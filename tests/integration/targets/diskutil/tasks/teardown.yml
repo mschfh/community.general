@@ -20,7 +20,7 @@
     cmd: "hdiutil detach -force {{ diskutil_test_image }}"
   become: true
   changed_when: false
-  when: diskutil_test_detach is not defined or diskutil_test_detach.rc != 0
+  when: diskutil_test_detach.rc | default(1) != 0
 
 - name: Remove the disk image
   ansible.builtin.file:
