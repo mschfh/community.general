@@ -7,12 +7,9 @@
     cmd: "hdiutil detach -force {{ diskutil_test_disk_node }}"
   become: true
   changed_when: false
+  # Detaching is best-effort cleanup: a failure here must not keep the remaining cleanup from running.
+  failed_when: false
   register: diskutil_test_detach
-  when: diskutil_test_disk_node is defined
-
-- name: Show the output of detaching the disk image
-  ansible.builtin.debug:
-    msg: "{{ diskutil_test_detach.stdout_lines | default([]) }}"
   when: diskutil_test_disk_node is defined
 
 - name: Detach the disk image by its file as a fallback
@@ -20,14 +17,20 @@
     cmd: "hdiutil detach -force {{ diskutil_test_image }}"
   become: true
   changed_when: false
-  when: diskutil_test_detach.rc | default(1) != 0
+  failed_when: false
+  register: diskutil_test_detach_fallback
+  when: diskutil_test_disk_node is not defined or diskutil_test_detach.rc | default(1) != 0
 
-- name: Remove the disk image
+- name: Show the result of detaching the disk image
+  ansible.builtin.debug:
+    msg: "{{ {'disk': diskutil_test_detach.stdout_lines | default([]), 'image': diskutil_test_detach_fallback.stdout_lines | default([]), 'stderr': diskutil_test_detach.stderr | default('') ~ diskutil_test_detach_fallback.stderr | default('')}}"
+
+- name: Remove the disk image and the mount points
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   become: true
   loop:
-    - "{{ diskutil_test_image }}"
+    - "{{ diskutil_test_image | default(diskutil_test_image_base) }}"
     - "{{ diskutil_test_mount_point }}"
     - "{{ diskutil_test_other_mount_point }}"

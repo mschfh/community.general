@@ -4,10 +4,14 @@
 
 - name: Create a sparse APFS disk image
   ansible.builtin.command:
-    cmd: "hdiutil create -size {{ diskutil_test_image_size }} -type SPARSE -fs APFS {{ diskutil_test_image }}"
+    cmd: "hdiutil create -size {{ diskutil_test_image_size }} -type SPARSE -fs APFS {{ diskutil_test_image_base }}"
   become: true
   changed_when: true
   register: diskutil_test_create
+
+- name: Determine the path of the disk image that was created
+  ansible.builtin.set_fact:
+    diskutil_test_image: "{{ diskutil_test_create.stdout.split(': ', 1)[1].strip() }}"
 
 - name: Attach the disk image without mounting it
   ansible.builtin.command:

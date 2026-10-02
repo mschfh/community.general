@@ -3,11 +3,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The tests work on a throwaway sparse disk image, so they never touch a real disk of the host.
+# `hdiutil create -type SPARSE` appends `.sparseimage` to the given path, so the path of the disk image
+# is determined from the output of `hdiutil create` in `tasks/setup.yml`.
 diskutil_test_image_size: 512m
-diskutil_test_image: "/tmp/diskutil-test-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}.dmg"
+diskutil_test_image_base: "/tmp/diskutil-test-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}.dmg"
+# The mount points are not placed under /tmp, because diskutil reports the resolved path of a mount point,
+# and /tmp is a symlink to /private/tmp.
+diskutil_test_mount_point: "/Volumes/diskutil-test-mount-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"
+diskutil_test_other_mount_point: "/Volumes/diskutil-test-mount-other-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"
 diskutil_test_apfs_volume: DiskutilTestData
 diskutil_test_renamed_volume: DiskutilTestRenamed
 diskutil_test_mount_volume: DiskutilTestMount
 diskutil_test_scratch_volume: DiskutilTestScratch
-diskutil_test_mount_point: "/tmp/diskutil-test-mount-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"
-diskutil_test_other_mount_point: "/tmp/diskutil-test-mount-other-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}"
