@@ -146,7 +146,7 @@ jobs:
           ansible-test units --color no \
             tests/unit/plugins/modules/test_diskutil.py \
             --requirements \
-            --python "$(command -v python)" -v 2>&1 | tee /tmp/units.log
+            --python-interpreter "$(command -v python)" -v 2>&1 | tee /tmp/units.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Run the integration tests of the new module
@@ -157,23 +157,25 @@ jobs:
             diskutil \
             --allow-root \
             --allow-destructive \
-            --python "$(command -v python)" -v 2>&1 | tee /tmp/integration.log
+            --python-interpreter "$(command -v python)" -v 2>&1 | tee /tmp/integration.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Verify that the tests really ran
         if: always()
         run: |
           status=0
-          if grep -q "All targets skipped" /tmp/integration.log; then
-            echo "::error::No integration target was run"
-            status=1
-          fi
-          if grep -qE "No module named pytest" /tmp/units.log; then
-            echo "::error::The unit tests could not be collected"
-            status=1
-          fi
+          for log in /tmp/units.log /tmp/integration.log; do
+            if grep -qE "ansible-test (units|integration): error:|No module named pytest|All targets skipped" "$log"; then
+              echo "::error::$log did not run the tests"
+              status=1
+            fi
+          done
           if ! grep -qE "[0-9]+ passed" /tmp/units.log; then
             echo "::error::The unit tests did not report any passing test"
+            status=1
+          fi
+          if ! grep -q "PLAY RECAP" /tmp/integration.log; then
+            echo "::error::The integration tests did not run any play"
             status=1
           fi
           exit $status
