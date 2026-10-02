@@ -1,0 +1,156 @@
+---
+# Copyright (c) 2026 mschfh
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# TEMPORARY workflow, not meant to be merged upstream.
+#
+# The regular CI of community.general runs on Azure Pipelines, which cannot be triggered from a
+# branch of a fork. This workflow runs the checks for the new `diskutil` module on a real macOS
+# runner instead. It is deliberately limited to the new module, so that it does not consume more
+# CI resources than needed while the module is being developed.
+
+name: macOS diskutil
+
+'on':
+  push:
+    branches:
+      - diskutil-module
+  workflow_dispatch:
+
+concurrency:
+  # Make sure there is at most one active run per branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COLLECTION_ROOT: ansible_collections/community/general
+  ANSIBLE_CORE: ">=2.20,<2.21"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint the new module
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the collection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          # ansible-test requires the collection to live at .../ansible_collections/community/general
+          path: ${{ env.COLLECTION_ROOT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ansible-core
+        run: python -m pip install "ansible-core${{ env.ANSIBLE_CORE }}"
+
+      - name: Report the platform
+        run: |
+          sw_vers
+          which diskutil
+          diskutil list
+
+      - name: Install ruff
+        run: python -m pip install "ruff==0.16.10"
+
+      - name: Check the formatting of the new Python files
+        run: |
+          ruff check --config ruff-modules.toml \
+            plugins/modules/diskutil.py \
+            tests/unit/plugins/modules/test_diskutil.py
+          ruff format --check --config ruff-modules.toml \
+            plugins/modules/diskutil.py \
+            tests/unit/plugins/modules/test_diskutil.py
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Run the sanity tests for the new files
+        run: |
+          ansible-test sanity --color no \
+            plugins/modules/diskutil.py \
+            tests/unit/plugins/modules/test_diskutil.py \
+            tests/unit/plugins/modules/test_diskutil.yaml \
+            tests/integration/targets/diskutil/aliases \
+            tests/integration/targets/diskutil/defaults/main.yml \
+            tests/integration/targets/diskutil/tasks/main.yml \
+            tests/integration/targets/diskutil/tasks/setup.yml \
+            tests/integration/targets/diskutil/tasks/teardown.yml \
+            tests/integration/targets/diskutil/tasks/idempotent.yml \
+            tests/integration/targets/diskutil/tasks/tests/test_info.yml \
+            tests/integration/targets/diskutil/tasks/tests/test_apfs_volume.yml \
+            tests/integration/targets/diskutil/tasks/tests/test_mount.yml \
+            tests/integration/targets/diskutil/tasks/tests/test_ownership.yml \
+            tests/integration/targets/diskutil/tasks/tests/test_erase.yml
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Run the extra sanity checks
+        run: |
+          pip install pydantic
+          python tests/sanity/extra/botmeta.py
+          python tests/sanity/extra/aliases.py
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+  test:
+    name: Run the unit and integration tests on macOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the collection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          path: ${{ env.COLLECTION_ROOT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ansible-core
+        run: python -m pip install "ansible-core${{ env.ANSIBLE_CORE }}"
+
+      - name: Install the collection dependencies
+        run: |
+          ansible-galaxy collection install \
+            community.internal_test_tools \
+            community.library_inventory_filtering_v1 \
+            -p ansible_collections
+
+      - name: Report the platform
+        run: |
+          sw_vers
+          ansible-test --version
+          sudo -n true && echo "passwordless sudo works"
+
+      - name: Run the unit tests of the new module
+        run: |
+          ansible-test units --color no \
+            tests/unit/plugins/modules/test_diskutil.py \
+            --python ${{ env.PYTHON_VERSION }} -v
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Run the integration tests of the new module
+        run: |
+          ansible-test integration --color no \
+            diskutil \
+            --python ${{ env.PYTHON_VERSION }} -v
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Show the test results
+        if: always()
+        run: |
+          echo "::group::The disks that are attached now"
+          diskutil list || true
+          echo "::endgroup::"
+          echo "::group::The test output"
+          find tests/output -type f \( -name "result.yml" -o -name "result.json" -o -name "*.txt" \) \
+            -exec echo "--- {} ---" \; -exec tail -n 200 {} \; || true
+          echo "::endgroup::"
+        working-directory: ${{ env.COLLECTION_ROOT }}
