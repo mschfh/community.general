@@ -101,11 +101,14 @@ jobs:
     name: Run the unit and integration tests on macOS
     runs-on: macos-latest
     timeout-minutes: 45
+    permissions:
+      # Needed to push the log files of this job to the `ci-output` branch, because the GitHub
+      # Actions log endpoints require authentication and the developer of this branch is not.
+      contents: write
     steps:
       - name: Check out the collection
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          persist-credentials: false
           path: ${{ env.COLLECTION_ROOT }}
 
       - name: Set up Python
@@ -130,27 +133,54 @@ jobs:
           sudo -n true && echo "passwordless sudo works"
 
       - name: Run the unit tests of the new module
+        id: units
+        continue-on-error: true
         run: |
           ansible-test units --color no \
             tests/unit/plugins/modules/test_diskutil.py \
-            --python ${{ env.PYTHON_VERSION }} -v
+            --python ${{ env.PYTHON_VERSION }} -v 2>&1 | tee /tmp/units.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Run the integration tests of the new module
+        id: integration
+        continue-on-error: true
         run: |
           ansible-test integration --color no \
             diskutil \
-            --python ${{ env.PYTHON_VERSION }} -v
+            --python ${{ env.PYTHON_VERSION }} -v 2>&1 | tee /tmp/integration.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
-      - name: Show the test results
+      - name: Collect the results
         if: always()
         run: |
-          echo "::group::The disks that are attached now"
-          diskutil list || true
-          echo "::endgroup::"
-          echo "::group::The test output"
-          find tests/output -type f \( -name "result.yml" -o -name "result.json" -o -name "*.txt" \) \
-            -exec echo "--- {} ---" \; -exec tail -n 200 {} \; || true
-          echo "::endgroup::"
+          echo "unit tests:      ${{ steps.units.outcome }}"  > /tmp/status.txt
+          echo "integration tests: ${{ steps.integration.outcome }}" >> /tmp/status.txt
+          echo "" >> /tmp/status.txt
+          echo "### disks still attached" >> /tmp/status.txt
+          diskutil list >> /tmp/status.txt 2>&1 || true
+          mkdir -p ci-output
+          cp /tmp/status.txt /tmp/units.log /tmp/integration.log ci-output/ 2>/dev/null || true
+          if [ -d tests/output ]; then
+            find tests/output -type f \( -name "result.yml" -o -name "*.json" -o -name "*.txt" -o -name "*.log" \) \
+              -exec sh -c 'echo "--- {} ---"; tail -n 400 "$1"' _ {} \; \
+              > ci-output/test-output.txt 2>&1 || true
+          fi
         working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Publish the results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f ci-output
+          TREE=$(git write-tree)
+          COMMIT=$(git commit-tree "$TREE" -p "$(git rev-parse HEAD)" -m "ci: logs of run ${{ github.run_id }}")
+          git push --force origin "$COMMIT:refs/heads/ci-output"
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Fail if a test failed
+        if: steps.units.outcome == 'failure' || steps.integration.outcome == 'failure'
+        run: |
+          echo "unit tests: ${{ steps.units.outcome }}, integration tests: ${{ steps.integration.outcome }}"
+          echo "See https://github.com/mschfh/community.general/tree/ci-output/ci-output for the logs"
+          exit 1
