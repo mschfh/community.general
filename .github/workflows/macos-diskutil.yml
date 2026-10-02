@@ -163,6 +163,19 @@ jobs:
             --python-interpreter "$(command -v python)" -v 2>&1 | tee /tmp/integration.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
+      - name: Collect the plist output of diskutil
+        if: always()
+        run: |
+          mkdir -p ci-output/plists
+          sw_vers > ci-output/platform.txt 2>&1 || true
+          echo "### diskutil listFilesystems" >> ci-output/platform.txt
+          diskutil listFilesystems >> ci-output/platform.txt 2>&1 || true
+          diskutil list -plist > ci-output/plists/list.xml 2>&1 || true
+          diskutil apfs list -plist > ci-output/plists/apfs-list.xml 2>&1 || true
+          diskutil apfs listVolumeGroups -plist > ci-output/plists/apfs-volume-groups.xml 2>&1 || true
+          diskutil info -plist / > ci-output/plists/info-boot.xml 2>&1 || true
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
       - name: Verify that the tests really ran
         if: always()
         run: |

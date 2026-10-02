@@ -23,7 +23,14 @@
 
 - name: Show the result of detaching the disk image
   ansible.builtin.debug:
-    msg: "{{ {'disk': diskutil_test_detach.stdout_lines | default([]), 'image': diskutil_test_detach_fallback.stdout_lines | default([]), 'stderr': diskutil_test_detach.stderr | default('') ~ diskutil_test_detach_fallback.stderr | default('')}}"
+    msg:
+      device: "{{ diskutil_test_detach.stdout_lines | default([]) }}"
+      image: "{{ diskutil_test_detach_fallback.stdout_lines | default([]) }}"
+      stderr: >-
+        {{
+          (diskutil_test_detach.stderr | default(''))
+          ~ (diskutil_test_detach_fallback.stderr | default(''))
+        }}
 
 - name: Remove the disk image and the mount points
   ansible.builtin.file:
