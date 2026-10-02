@@ -126,10 +126,17 @@ jobs:
             community.library_inventory_filtering_v1 \
             -p ansible_collections
 
+      - name: Install the test requirements
+        run: |
+          python -m pip install --upgrade "pytest<9" pytest-xdist pytest-mock
+          python -m pip list
+
       - name: Report the platform
         run: |
           sw_vers
           ansible-test --version
+          which python
+          python -c "import pytest; print('pytest', pytest.__version__)"
           sudo -n true && echo "passwordless sudo works"
 
       - name: Run the unit tests of the new module
@@ -138,7 +145,8 @@ jobs:
         run: |
           ansible-test units --color no \
             tests/unit/plugins/modules/test_diskutil.py \
-            --python ${{ env.PYTHON_VERSION }} -v 2>&1 | tee /tmp/units.log
+            --requirements \
+            --python "$(command -v python)" -v 2>&1 | tee /tmp/units.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Run the integration tests of the new module
@@ -147,7 +155,28 @@ jobs:
         run: |
           ansible-test integration --color no \
             diskutil \
-            --python ${{ env.PYTHON_VERSION }} -v 2>&1 | tee /tmp/integration.log
+            --allow-root \
+            --allow-destructive \
+            --python "$(command -v python)" -v 2>&1 | tee /tmp/integration.log
+        working-directory: ${{ env.COLLECTION_ROOT }}
+
+      - name: Verify that the tests really ran
+        if: always()
+        run: |
+          status=0
+          if grep -q "All targets skipped" /tmp/integration.log; then
+            echo "::error::No integration target was run"
+            status=1
+          fi
+          if grep -qE "No module named pytest" /tmp/units.log; then
+            echo "::error::The unit tests could not be collected"
+            status=1
+          fi
+          if ! grep -qE "[0-9]+ passed" /tmp/units.log; then
+            echo "::error::The unit tests did not report any passing test"
+            status=1
+          fi
+          exit $status
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Collect the results
