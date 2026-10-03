@@ -167,54 +167,71 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -o pipefail
-          main() {
+          set +e
           WORK=$(mktemp -d)
           mkdir -p ci-output
-          probe() {
-            echo "########## PROBE: $1"
-            shift
-            "$@" 2>&1 || true
-          }
-          attach() {
-            # echoes "<whole disk> <apfs container> <container volume>"
-            OUT=$(sudo hdiutil attach -nomount "$1" 2>&1 || true)
-            echo "$OUT"
-            DEV=$(echo "$OUT" | head -1 | awk '{print $1}')
-            CONT=$(echo "$OUT" | grep EF57347C | head -1 | awk '{print $1}')
-            VOL=$(echo "$OUT" | grep 41504653 | head -1 | awk '{print $1}')
-            echo "PROBE-RESULT dev=$DEV cont=$CONT vol=$VOL"
-          }
-          find_container() {
-            # finds the APFS container that uses the given physical store
-            diskutil apfs list -plist | grep -A3 "$1" | grep -m1 ContainerReference | sed 's/.*<string>\(.*\)<\/string>.*/\1/'
+          exec > >(tee ci-output/probe.txt) 2>&1
+
+          container_of() {
+            python3 -c '
+          import plistlib, subprocess, sys
+          prefix = sys.argv[1]
+          out = subprocess.run(["diskutil", "apfs", "list", "-plist"], capture_output=True, text=True).stdout
+          data = plistlib.loads(out.encode())
+          for container in data.get("Containers") or data.get("APFSContainers") or []:
+              for store in container.get("PhysicalStores") or container.get("APFSPhysicalStores") or []:
+                  identifier = store.get("DeviceIdentifier") or store.get("APFSPhysicalStore") or ""
+                  if identifier == prefix or identifier.startswith(prefix + "s"):
+                      print(container.get("ContainerReference") or container.get("APFSContainerReference"))
+                      sys.exit(0)
+          ' "$1"
           }
 
-          probe "A: hdiutil -fs APFS" sudo hdiutil create -size 4096m -type SPARSE -fs APFS "$WORK/a.dmg"
-          probe "attach A" attach "$WORK/a.dmg.sparseimage"
-          probe "A: apfs addVolume on the synthesized container" sudo diskutil apfs addVolume disk8 APFS DiagVolA
-          probe "A: apfs addVolume on the physical store" sudo diskutil apfs addVolume disk7s1 APFS DiagVolA2
+          first_line() { head -1 | cut -f1; }
+          by_type() { grep -m1 "$1" | cut -f1; }
 
-          probe "B: raw image without -fs" sudo hdiutil create -size 4096m -type SPARSE "$WORK/b.dmg"
-          probe "attach B" attach "$WORK/b.dmg.sparseimage"
-          probe "B: list" diskutil list
-          probe "B: partitionDisk GPT APFS" sudo diskutil partitionDisk disk9 GPT APFS APFSC
-          probe "B: list" diskutil list
-          probe "B: find container" find_container disk9s1
-          probe "B: apfs addVolume" sudo diskutil apfs addVolume "$(find_container disk9s1)" APFS DiagVolB
-          probe "B: apfs list" diskutil apfs list
+          echo "=================== A: hdiutil -fs APFS"
+          sudo hdiutil create -size 4096m -type SPARSE -fs APFS "$WORK/a.dmg"
+          OUT=$(sudo hdiutil attach -nomount "$WORK/a.dmg.sparseimage")
+          echo "$OUT"
+          A_DEV=$(echo "$OUT" | first_line)
+          A_CONT=$(echo "$OUT" | by_type EF57347C)
+          A_VOL=$(echo "$OUT" | by_type 41504653)
+          echo "A_DEV=$A_DEV A_CONT=$A_CONT A_VOL=$A_VOL"
+          sudo diskutil apfs addVolume "$A_CONT" APFS DiagVolA
+          echo "A addVolume rc=$?"
+          diskutil apfs list
 
-          probe "C: eraseDisk on the hdiutil image" sudo diskutil eraseDisk APFS APFSC GPT disk7
-          probe "C: list" diskutil list
-          probe "C: find container" find_container disk7s1
-          probe "C: apfs addVolume" sudo diskutil apfs addVolume "$(find_container disk7s1)" APFS DiagVolC
-          probe "C: apfs list" diskutil apfs list
+          echo "=================== B: raw image plus partitionDisk"
+          sudo hdiutil create -size 4096m -type SPARSE "$WORK/b.dmg"
+          OUTB=$(sudo hdiutil attach -nomount "$WORK/b.dmg.sparseimage")
+          echo "$OUTB"
+          B_DEV=$(echo "$OUTB" | first_line)
+          echo "B_DEV=$B_DEV"
+          diskutil list
+          sudo diskutil partitionDisk "$B_DEV" GPT APFS APFSC
+          echo "B partitionDisk rc=$?"
+          diskutil list
+          B_CONT=$(container_of "$B_DEV")
+          echo "B_CONT=$B_CONT"
+          sudo diskutil apfs addVolume "$B_CONT" APFS DiagVolB
+          echo "B addVolume rc=$?"
+          diskutil apfs list
 
-          probe "detach" sudo hdiutil detach -force disk7
-          probe "detach b" sudo hdiutil detach -force disk9
+          echo "=================== C: eraseDisk on the hdiutil image"
+          sudo diskutil eraseDisk APFS APFSC GPT "$A_DEV"
+          echo "C eraseDisk rc=$?"
+          diskutil list
+          C_CONT=$(container_of "$A_DEV")
+          echo "C_CONT=$C_CONT"
+          sudo diskutil apfs addVolume "$C_CONT" APFS DiagVolC
+          echo "C addVolume rc=$?"
+          diskutil apfs list
+
+          echo "=================== cleanup"
+          sudo hdiutil detach -force "$A_DEV"
+          sudo hdiutil detach -force "$B_DEV"
           rm -rf "$WORK"
-          }
-          main 2>&1 | tee ci-output/probe.txt
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Verify that the tests really ran
