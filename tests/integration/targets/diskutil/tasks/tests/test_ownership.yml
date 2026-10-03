@@ -10,11 +10,19 @@
       device: "{{ diskutil_test_container_volume }}"
     diskutil_test_expect_changed: true
 
-- name: Disabling ownership is not a no-op
+- name: A volume of a fresh APFS container has its ownership disabled already
   ansible.builtin.include_tasks: ../idempotent.yml
   vars:
     diskutil_test_params:
       state: unowned
+      device: "{{ diskutil_test_container_volume }}"
+    diskutil_test_expect_changed: false
+
+- name: Enabling ownership is not a no-op
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: owned
       device: "{{ diskutil_test_container_volume }}"
     diskutil_test_expect_changed: true
 
@@ -23,20 +31,19 @@
     info_type: device
     device: "{{ diskutil_test_container_volume }}"
   become: true
-  register: diskutil_test_ownership_unowned
+  register: diskutil_test_ownership_owned
 
-- name: Assert that ownership is disabled
+- name: Assert that ownership is enabled
   ansible.builtin.assert:
     that:
-      - diskutil_test_ownership_unowned.ownership_disabled
-      - "'Enabled' not in diskutil_test_ownership_unowned.owners"
-    fail_msg: "Ownership is still enabled: {{ diskutil_test_ownership_unowned.owners }}"
+      - not diskutil_test_ownership_owned.ownership_disabled
+    fail_msg: "Ownership is still disabled: {{ diskutil_test_ownership_owned.owners }}"
 
-- name: Enabling ownership again is not a no-op
+- name: Disabling ownership again is not a no-op
   ansible.builtin.include_tasks: ../idempotent.yml
   vars:
     diskutil_test_params:
-      state: owned
+      state: unowned
       device: "{{ diskutil_test_container_volume }}"
     diskutil_test_expect_changed: true
 
@@ -45,13 +52,14 @@
     info_type: device
     device: "{{ diskutil_test_container_volume }}"
   become: true
-  register: diskutil_test_ownership_owned
+  register: diskutil_test_ownership_unowned
 
-- name: Assert that ownership is enabled again
+- name: Assert that ownership is disabled again
   ansible.builtin.assert:
     that:
-      - not diskutil_test_ownership_owned.ownership_disabled
-    fail_msg: "Ownership is still disabled: {{ diskutil_test_ownership_owned.owners }}"
+      - diskutil_test_ownership_unowned.ownership_disabled
+      - "'Enabled' not in diskutil_test_ownership_unowned.owners"
+    fail_msg: "Ownership is still enabled: {{ diskutil_test_ownership_unowned.owners }}"
 
 - name: Ownership cannot be disabled on the container itself
   community.general.diskutil:
