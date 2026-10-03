@@ -177,7 +177,7 @@ jobs:
           } >> ci-output/platform.txt 2>&1 || true
 
           WORK=$(mktemp -d)
-          sudo hdiutil create -size 512m -type SPARSE -fs APFS "$WORK/diag.dmg" >> ci-output/platform.txt 2>&1 || true
+          sudo hdiutil create -size 4096m -type SPARSE -fs APFS "$WORK/diag.dmg" >> ci-output/platform.txt 2>&1 || true
           OUT=$(sudo hdiutil attach -nomount "$WORK/diag.dmg.sparseimage" 2>&1 || true)
           echo "$OUT" >> ci-output/platform.txt
           DEV=$(echo "$OUT" | head -1 | awk '{print $1}')
@@ -212,6 +212,8 @@ jobs:
           snap info-container-volume-mounted.xml "$VOL"
           snap info-container-disk.xml "$CONT"
 
+          dump diskutil mount "$VOL"
+          snap info-container-volume-remounted.xml "$VOL"
           dump diskutil disableOwnership "$VOL"
           snap info-container-volume-unowned.xml "$VOL"
           dump diskutil enableOwnership "$VOL"
@@ -219,8 +221,6 @@ jobs:
 
           dump diskutil unmount "$VOL"
           snap info-container-volume-unmounted.xml "$VOL"
-          dump diskutil mount "$VOL"
-          snap info-container-volume-remounted.xml "$VOL"
           dump_plain diskutil info "$VOL"
           dump_plain diskutil list
           dump_plain diskutil apfs listVolumeGroups
