@@ -2,26 +2,26 @@
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-- name: Enabling ownership on the APFS container is not a no-op
+- name: Mount the volume of the APFS container, because ownership cannot be changed while it is unmounted
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: mounted
+      device: "{{ diskutil_test_container_volume }}"
+    diskutil_test_expect_changed: true
+
+- name: Enabling ownership is not a no-op
   ansible.builtin.include_tasks: ../idempotent.yml
   vars:
     diskutil_test_params:
       state: owned
-      device: "{{ diskutil_test_container }}"
-    diskutil_test_expect_changed: false
-
-- name: Disabling ownership is not a no-op
-  ansible.builtin.include_tasks: ../idempotent.yml
-  vars:
-    diskutil_test_params:
-      state: unowned
-      device: "{{ diskutil_test_container }}"
+      device: "{{ diskutil_test_container_volume }}"
     diskutil_test_expect_changed: true
 
-- name: Get the information of the APFS container
+- name: Get the information of the volume
   community.general.diskutil:
     info_type: device
-    device: "{{ diskutil_test_container }}"
+    device: "{{ diskutil_test_container_volume }}"
   become: true
   register: diskutil_test_ownership_info
 
@@ -36,13 +36,13 @@
   vars:
     diskutil_test_params:
       state: owned
-      device: "{{ diskutil_test_container }}"
+      device: "{{ diskutil_test_container_volume }}"
     diskutil_test_expect_changed: true
 
-- name: Get the information of the APFS container again
+- name: Get the information of the volume again
   community.general.diskutil:
     info_type: device
-    device: "{{ diskutil_test_container }}"
+    device: "{{ diskutil_test_container_volume }}"
   become: true
   register: diskutil_test_ownership_info_enabled
 

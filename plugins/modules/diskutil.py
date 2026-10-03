@@ -12,8 +12,8 @@ module: diskutil
 short_description: Manage disks and volumes on macOS
 description:
   - This module manages disks and volumes on macOS hosts by using the C(diskutil) command.
-  - Use O(info_type) to query disks, volumes, APFS containers, APFS volume groups, file systems and mount
-    points. These queries never modify anything and do not require root privileges.
+  - Use O(info_type) to query disks, a device, APFS containers, APFS volume groups and file systems. These
+    queries never modify anything and do not require root privileges.
   - Use O(state) to idempotently change the mount state of a disk or a volume, the presence of an APFS volume,
     the ownership of a volume, or to erase a disk or a volume. All state changes require root privileges.
 author:
@@ -41,7 +41,7 @@ options:
         volume that already exists. In this case the volume is renamed to O(volume_name) instead.
       - With V(mounted) and V(unmounted), the volume is mounted or unmounted. If O(mount_point) is set while
         the volume is mounted somewhere else, the volume is unmounted first and then mounted at O(mount_point).
-      - With V(ejected), all volumes of the whole disk O(device) are unmounted, and the disk is ejected.
+      - With V(ejected), all mounted volumes of the whole disk O(device) are unmounted, and the disk is ejected.
       - With V(owned) and V(unowned), ownership on the volume O(device) is enabled or disabled.
       - With V(erased), the disk or the volume is erased and re-created with the file system and the name given
         in O(filesystem) and O(volume_name). Erasing is irreversible, and therefore requires O(erase_confirm) to
@@ -52,27 +52,28 @@ options:
   info_type:
     description:
       - The kind of information to query. Nothing is modified when this option is used.
-      - V(disks) queries all disks together with their partitions.
+      - V(disks) queries all disks together with their partitions and the volumes of their APFS containers.
       - V(device) queries all information about O(device).
       - V(apfs) queries all APFS containers together with their volumes.
       - V(volume_groups) queries all APFS volume groups.
-      - V(filesystems) queries all file systems known to the system.
-      - V(mountinfo) queries the mount information of O(device).
+      - V(filesystems) queries all file systems that can be used for erasing and partitioning.
       - Mutually exclusive with O(state).
     type: str
-    choices: [disks, device, apfs, volume_groups, filesystems, mountinfo]
+    choices: [disks, device, apfs, volume_groups, filesystems]
   device:
     description:
       - The device to operate on.
       - Can be a device identifier like V(disk2) or V(disk2s1), a device node like V(/dev/disk2), a volume
-        name, or a volume UUID.
-      - Required for O(info_type=device), O(info_type=mountinfo), and for the V(mounted), V(unmounted),
-        V(ejected), V(owned), V(unowned) and V(erased) states.
+        name, or a volume UUID. Device nodes are converted to device identifiers before they are passed to
+        C(diskutil).
+      - Required for O(info_type=device), and for the V(mounted), V(unmounted), V(ejected), V(owned),
+        V(unowned) and V(erased) states.
     type: str
   container:
     description:
       - The APFS container to add the APFS volume to, or to remove the APFS volume from.
-      - This is a device identifier like V(disk2s1), or a device node like V(/dev/disk2s1).
+      - This is the APFS container reference as reported by C(diskutil apfs list), for example V(disk2s1) on
+        older versions of macOS, or V(disk2) for a container that is its own synthesized disk.
     type: str
   volume_name:
     description:
@@ -93,7 +94,7 @@ options:
   filesystem:
     description:
       - The file system to use for a new APFS volume, or the file system to erase a disk or a volume with.
-      - See the possible values by running C(diskutil listFilesystems) on the target host.
+      - See the possible values by querying O(info_type=filesystems) on the target host.
     type: str
     default: APFS
   quota:
@@ -136,6 +137,9 @@ notes:
   - Only the read-only queries work without root privileges. Use C(become=true) for all state changes.
   - Erasing a disk or a volume with V(state=erased) cannot be undone. The module only performs the operation
     when O(erase_confirm) is enabled.
+  - macOS 26 renamed several keys of the property lists that C(diskutil -plist) prints, and no longer has the
+    C(mountinfo) verb. The module uses the new keys where they exist, and the old ones otherwise, so that it
+    works with older versions of macOS as well.
 """
 
 EXAMPLES = r"""
@@ -149,7 +153,7 @@ EXAMPLES = r"""
     info_type: apfs
   register: containers
 
-- name: List all file systems known to the system
+- name: List all file systems that can be used for erasing
   community.general.diskutil:
     info_type: filesystems
 
@@ -157,11 +161,6 @@ EXAMPLES = r"""
   community.general.diskutil:
     info_type: device
     device: /dev/disk2s1
-
-- name: Get the mount information of a volume
-  community.general.diskutil:
-    info_type: mountinfo
-    device: disk2s1
 
 - name: Mount a volume at /Volumes/data
   community.general.diskutil:
@@ -186,7 +185,7 @@ EXAMPLES = r"""
 - name: Create an APFS volume in a container
   community.general.diskutil:
     state: present
-    container: disk2s1
+    container: disk2
     volume_name: Data
     quota: 100g
   become: true
@@ -201,7 +200,7 @@ EXAMPLES = r"""
 - name: Remove an APFS volume from its container
   community.general.diskutil:
     state: absent
-    container: disk2s1
+    container: disk2
     volume_name: Data
   become: true
 
@@ -237,18 +236,19 @@ before:
   description: The device information before the module made any changes.
   returned: when diff mode is active and O(device) is specified
   type: dict
-  sample: {"DeviceIdentifier": "disk2s1", "Mounted": false, "FileSystemPersonality": "APFS"}
+  sample: {"DeviceIdentifier": "disk2s1", "MountPoint": "", "FilesystemName": "APFS"}
 after:
   description: The device information after the module made any changes.
   returned: when diff mode is active and O(device) is specified
   type: dict
-  sample: {"DeviceIdentifier": "disk2s1", "Mounted": true, "FileSystemPersonality": "APFS"}
+  sample: {"DeviceIdentifier": "disk2s1", "MountPoint": "/Volumes/data", "FilesystemName": "APFS"}
 disks:
-  description: The normalized disks together with their partitions, when O(info_type=disks) is used.
+  description: The normalized disks together with their partitions and APFS volumes, when O(info_type=disks)
+    is used.
   returned: when O(info_type=disks) is used
   type: list
   elements: dict
-  sample: [{"device_identifier": "disk0", "media_type": "NVM", "size": 500107862016, "partitions": []}]
+  sample: [{"device_identifier": "disk0", "size": 500107862016, "partitions": []}]
 whole_disks:
   description: The device identifiers of all whole disks, when O(info_type=disks) is used.
   returned: when O(info_type=disks) is used
@@ -260,35 +260,31 @@ partitions:
   returned: when O(info_type=disks) is used
   type: list
   elements: dict
-  sample: [{"device_identifier": "disk2s1", "name": "Untitled", "filesystem": "APFS", "mounted": true}]
+  sample: [{"device_identifier": "disk2s1", "name": "untitled", "filesystem": "APFS", "mounted": true}]
 containers:
   description: The normalized APFS containers together with their volumes, when O(info_type=apfs) is used.
   returned: when O(info_type=apfs) is used
   type: list
   elements: dict
-  sample: [{"reference": "disk2s1", "capacity": 500107862016, "volumes": []}]
+  sample: [{"reference": "disk2", "capacity": 500107862016, "volumes": []}]
 volume_groups:
-  description: The APFS volume groups, when O(info_type=volume_groups) is used.
+  description: The normalized APFS volume groups, when O(info_type=volume_groups) is used.
   returned: when O(info_type=volume_groups) is used
   type: list
   elements: dict
   sample: []
 filesystems:
-  description: The file systems known to the system, when O(info_type=filesystems) is used.
+  description: The file systems that can be used for erasing and partitioning, when O(info_type=filesystems)
+    is used.
   returned: when O(info_type=filesystems) is used
   type: list
   elements: str
-  sample: ["APFS", "HFS", "HFS+J", "MS-DOS", "ExFAT", "UFS", "NTFS"]
-mount_info:
-  description: The mount information of O(device), when O(info_type=mountinfo) is used.
-  returned: when O(info_type=mountinfo) is used
-  type: dict
-  sample: {"MountPoint": "/Volumes/data", "MountedVolume": true, "MountedWritableVolume": true}
+  sample: ["APFS", "ExFAT", "MS-DOS", "HFS+", "Case-sensitive APFS", "Journaled HFS+"]
 info:
-  description: The raw, normalized output of C(diskutil info) for O(device).
+  description: The raw, normalized output of C(diskutil info -plist) for O(device).
   returned: when O(info_type=device) is used, or when a state change queried the device
   type: dict
-  sample: {"DeviceIdentifier": "disk2s1", "VolumeName": "data", "Mounted": true}
+  sample: {"DeviceIdentifier": "disk2s1", "VolumeName": "data", "MountPoint": "/Volumes/data"}
 volume_device:
   description: The device identifier of the APFS volume that was created, renamed or removed.
   returned: on success, when the V(present) or V(absent) state is used and a volume was found or affected
@@ -304,6 +300,11 @@ device_node:
   returned: when device information could be queried
   type: str
   sample: /dev/disk2s1
+parent_whole_disk:
+  description: The whole disk the queried device belongs to.
+  returned: when device information could be queried
+  type: str
+  sample: disk2
 whole_disk:
   description: Whether the queried device is a whole disk.
   returned: when device information could be queried
@@ -330,30 +331,40 @@ mount_point:
   type: str
   sample: /Volumes/data
 filesystem:
-  description: The file system of the queried volume.
+  description: The file system of the queried volume, in the spelling that C(diskutil) expects.
   returned: when device information could be queried
   type: str
   sample: APFS
+filesystem_type:
+  description: The file system type of the queried volume, as reported by C(diskutil).
+  returned: when device information could be queried
+  type: str
+  sample: apfs
 content:
   description: The content type of the queried device, for example V(Apple_APFS).
   returned: when device information could be queried
   type: str
   sample: Apple_APFS
+size:
+  description: The size of the queried device in bytes.
+  returned: when device information could be queried
+  type: int
+  sample: 500107862016
 volume_size:
   description: The size of the queried volume in bytes.
   returned: when device information could be queried
   type: int
   sample: 499963174912
-volume_free_space:
+free_space:
   description: The free space of the queried volume in bytes.
   returned: when device information could be queried
   type: int
   sample: 123456789012
-disk_size:
-  description: The size of the disk the queried volume belongs to, in bytes.
+block_size:
+  description: The block size of the queried device in bytes.
   returned: when device information could be queried
   type: int
-  sample: 500107862016
+  sample: 4096
 internal:
   description: Whether the queried device is internal to the machine.
   returned: when device information could be queried
@@ -364,11 +375,36 @@ ejectable:
   returned: when device information could be queried
   type: bool
   sample: false
+removable_media:
+  description: Whether the queried device is removable media.
+  returned: when device information could be queried
+  type: bool
+  sample: false
 solid_state:
   description: Whether the queried device is a solid state device.
   returned: when device information could be queried
   type: bool
   sample: true
+writable:
+  description: Whether the queried device is writable.
+  returned: when device information could be queried
+  type: bool
+  sample: true
+read_only:
+  description: Whether the queried device is read-only.
+  returned: when device information could be queried
+  type: bool
+  sample: false
+encrypted:
+  description: Whether the queried volume is encrypted.
+  returned: when device information could be queried
+  type: bool
+  sample: false
+media_name:
+  description: The media name of the queried device.
+  returned: when device information could be queried
+  type: str
+  sample: APPLE SSD AP0256Z
 media_type:
   description: The media type of the queried device, for example V(NVM).
   returned: when device information could be queried
@@ -379,8 +415,13 @@ protocol:
   returned: when device information could be queried
   type: str
   sample: NVMe
+smart_status:
+  description: The SMART status of the queried device.
+  returned: when device information could be queried
+  type: str
+  sample: Verified
 owners:
-  description: The ownership states of the queried volume, for example V([Enabled]).
+  description: The ownership states of the queried volume, if C(diskutil) reports them.
   returned: when device information could be queried
   type: list
   elements: str
@@ -390,11 +431,16 @@ ownership_disabled:
   returned: when device information could be queried
   type: bool
   sample: false
+ownership_supported:
+  description: Whether ownership can be disabled on the queried volume.
+  returned: when device information could be queried
+  type: bool
+  sample: true
 container_reference:
   description: The APFS container the queried volume belongs to.
   returned: when device information could be queried
   type: str
-  sample: disk2s1
+  sample: disk2
 apfs_group:
   description: The APFS volume group the queried volume belongs to.
   returned: when device information could be queried
@@ -415,6 +461,10 @@ from ansible.module_utils.common.text.converters import to_bytes
 
 MOUNT_STATES = ("mounted", "unmounted")
 OWNERSHIP_STATES = ("owned", "unowned")
+# The header of the second column of the table that `diskutil listFilesystems` prints. Its position
+# tells where the file system personalities end. Used as a fallback if the header is missing.
+FILESYSTEMS_HEADER = "USER VISIBLE NAME"
+FILESYSTEMS_COLUMN = 32
 
 
 def as_bool(value):
@@ -428,6 +478,14 @@ def as_bool(value):
     return False
 
 
+def first(mapping, *keys, default=None):
+    """Returns the value of the first of the given keys that is present in the mapping."""
+    for key in keys:
+        if key in mapping:
+            return mapping[key]
+    return default
+
+
 def device_id(device):
     """Returns the device identifier of a device node like ``/dev/disk2s1``."""
     if not device:
@@ -435,6 +493,25 @@ def device_id(device):
     if device.startswith("/dev/"):
         return device[len("/dev/") :]
     return device
+
+
+def device_node(identifier):
+    """Returns the device node of a device identifier like ``disk2s1``."""
+    if not identifier:
+        return None
+    if identifier.startswith("/dev/"):
+        return identifier
+    return f"/dev/{identifier}"
+
+
+def is_mounted(mapping):
+    """Returns whether a volume is mounted.
+
+    macOS 26 no longer reports a ``Mounted`` boolean, but an empty ``MountPoint`` instead.
+    """
+    if "Mounted" in mapping:
+        return as_bool(mapping["Mounted"])
+    return bool(mapping.get("MountPoint"))
 
 
 def sanitize(value):
@@ -451,77 +528,118 @@ def sanitize(value):
 
 
 def normalize_partition(partition):
-    """Normalizes one entry of a ``PartitionMaps`` list."""
+    """Normalizes one entry of a partition map, or of the APFS volumes of a container."""
+    identifier = partition.get("DeviceIdentifier")
     return {
-        "device_identifier": partition.get("DeviceIdentifier"),
-        "device_node": partition.get("DeviceNode"),
+        "device_identifier": identifier,
+        "device_node": partition.get("DeviceNode") or device_node(identifier),
         "name": partition.get("VolumeName"),
-        "volume_uuid": partition.get("VolumeUUID"),
+        "volume_uuid": partition.get("VolumeUUID") or partition.get("DiskUUID"),
         "content": partition.get("Content"),
-        "filesystem": partition.get("FileSystemPersonality"),
+        "filesystem": first(partition, "FileSystemPersonality", "FilesystemName"),
         "size": partition.get("Size"),
-        "block_size": partition.get("BlockSize"),
-        "mounted": as_bool(partition.get("Mounted")),
+        "block_size": first(partition, "BlockSize", "DeviceBlockSize"),
+        "mounted": is_mounted(partition),
         "mount_point": partition.get("MountPoint"),
         "writable": as_bool(partition.get("WritableVolume")),
         "read_only": as_bool(partition.get("ReadOnlyVolume")),
         "encrypted": as_bool(partition.get("VolumeEncryptionEnabled")),
         "container_reference": partition.get("APFSContainerReference"),
-        "apfs_group": partition.get("APFSVolumeGroup"),
+        "apfs_group": first(partition, "APFSVolumeGroup", "APFSVolumeGroupID"),
         "fusion_drive": partition.get("FusionDrive"),
     }
 
 
 def normalize_volume(volume):
-    """Normalizes one entry of an ``APFSContainerVolumes`` list."""
+    """Normalizes one entry of the volumes of an APFS container."""
+    identifier = first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier")
+    roles = volume.get("Roles")
+    if roles is None:
+        role = volume.get("APFSVolumeRole")
+        roles = [role] if role else []
     return {
-        "device_identifier": volume.get("APFSVolumeDeviceIdentifier"),
-        "name": volume.get("APFSVolumeName"),
+        "device_identifier": identifier,
+        "name": first(volume, "Name", "APFSVolumeName"),
         "uuid": volume.get("APFSVolumeUUID"),
-        "capacity": volume.get("APFSVolumeCapacity"),
+        "size": first(volume, "Size", "APFSVolumeCapacity"),
+        "capacity_in_use": volume.get("CapacityInUse"),
         "capacity_free": volume.get("APFSVolumeCapacityFree"),
-        "role": volume.get("APFSVolumeRole"),
-        "encrypted": as_bool(volume.get("APFSVolumeIsEncrypted")),
-        "filevault": as_bool(volume.get("APFSVolumeIsFileVault")),
-        "system": as_bool(volume.get("APFSVolumeIsSystem")),
-        "boot": as_bool(volume.get("APFSVolumeIsBoot")),
-        "time_machine": as_bool(volume.get("APFSVolumeIsTimeMachine")),
-        "apfs_group": volume.get("APFSVolumeGroup"),
+        "capacity_quota": volume.get("CapacityQuota"),
+        "capacity_reserve": volume.get("CapacityReserve"),
+        "roles": list(roles),
+        "encrypted": as_bool(first(volume, "Encryption", "APFSVolumeIsEncrypted")),
+        "filevault": as_bool(first(volume, "FileVault", "APFSVolumeIsFileVault")),
+        "locked": as_bool(volume.get("Locked")),
+        "system": as_bool(volume.get("APFSVolumeIsSystem")) or "System" in roles,
+        "recovery": as_bool(volume.get("APFSVolumeIsRecovery")) or "Recovery" in roles,
     }
 
 
 def normalize_container(container):
-    """Normalizes one entry of an ``APFSContainers`` list."""
-    stores = container.get("APFSPhysicalStores") or []
-    volumes = container.get("APFSContainerVolumes") or []
+    """Normalizes one entry of the APFS containers."""
+    stores = first(container, "PhysicalStores", "APFSPhysicalStores") or []
+    volumes = first(container, "Volumes", "APFSContainerVolumes") or []
     return {
-        "reference": container.get("APFSContainerReference"),
-        "capacity": container.get("APFSContainerCapacity"),
-        "capacity_free": container.get("APFSContainerCapacityFree"),
-        "physical_stores": [store.get("APFSPhysicalStore") or store.get("DeviceIdentifier") for store in stores],
+        "reference": first(container, "ContainerReference", "APFSContainerReference"),
+        "uuid": container.get("APFSContainerUUID"),
+        "capacity": first(container, "CapacityCeiling", "APFSContainerCapacity"),
+        "capacity_free": first(container, "CapacityFree", "APFSContainerCapacityFree"),
+        "physical_stores": [device_id(first(store, "APFSPhysicalStore", "DeviceIdentifier")) for store in stores],
         "volumes": [normalize_volume(volume) for volume in volumes],
     }
 
 
-def normalize_disk(disk):
-    """Normalizes one entry of the ``Disks`` list of ``diskutil list -plist``."""
-    partitions = disk.get("PartitionMaps") or []
+def normalize_disk(disk, volumes=None):
+    """Normalizes one whole disk, together with the volumes of its partitions."""
+    identifier = disk.get("DeviceIdentifier")
+    partitions = [normalize_partition(part) for part in (first(disk, "PartitionMaps", "Partitions") or [])]
+    if volumes:
+        partitions.extend(volumes)
     return {
-        "device_identifier": disk.get("DeviceIdentifier"),
-        "device_node": disk.get("DeviceNode"),
+        "device_identifier": identifier,
+        "device_node": disk.get("DeviceNode") or device_node(identifier),
         "media_name": disk.get("MediaName"),
         "media_type": disk.get("MediaType"),
-        "protocol": disk.get("Protocol"),
-        "internal": as_bool(disk.get("Internal")),
+        "protocol": first(disk, "Protocol", "BusProtocol"),
+        "internal": as_bool(first(disk, "Internal", "OSInternal")),
         "ejectable": as_bool(disk.get("Ejectable")),
         "removable_media": as_bool(disk.get("RemovableMedia")),
         "solid_state": as_bool(disk.get("SolidState")),
         "virtual_or_physical": disk.get("VirtualOrPhysical"),
-        "size": disk.get("Size"),
-        "block_size": disk.get("BlockSize"),
-        "smart_status": disk.get("SmartStatus"),
-        "partitions": [normalize_partition(part) for part in partitions],
+        "content": disk.get("Content"),
+        "size": first(disk, "Size", "IOKitSize"),
+        "block_size": first(disk, "BlockSize", "DeviceBlockSize"),
+        "smart_status": first(disk, "SmartStatus", "SMARTStatus"),
+        "partitions": partitions,
     }
+
+
+def parse_filesystems(output):
+    """Parses the table that ``diskutil listFilesystems`` prints.
+
+    The personalities are in the first column of the table, which has a fixed width. Aliases and the
+    user visible names are listed on indented continuation lines, which are ignored.
+    """
+    lines = output.splitlines()
+    # The last line of dashes separates the introduction from the table itself.
+    separators = [i for i, line in enumerate(lines) if line.strip() and set(line.strip()) == {"-"}]
+    if separators:
+        lines = lines[separators[-1] + 1 :]
+    column = FILESYSTEMS_COLUMN
+    for line in lines:
+        index = line.find(FILESYSTEMS_HEADER)
+        if index > 0:
+            column = index
+            break
+    personalities = []
+    for line in lines:
+        if not line.strip() or line[:1].isspace():
+            continue
+        personality = line[:column].rstrip()
+        if not personality or personality == "PERSONALITY":
+            continue
+        personalities.append(personality)
+    return personalities
 
 
 class DiskUtil:
@@ -564,41 +682,72 @@ class DiskUtil:
                 stderr=err,
             )
 
-    def info(self, device):
+    def info(self, device, allow_failure=False):
         """Returns the parsed output of ``diskutil info -plist`` for a device."""
-        return self.plist(["info", device])
-
-    def info_or_none(self, device):
-        """Same as :meth:`info`, but returns C(None) instead of failing."""
-        return self.plist(["info", device], allow_failure=True)
+        return self.plist(["info", device_id(device)], allow_failure=allow_failure)
 
     def disks(self):
         """Returns the parsed output of ``diskutil list -plist``."""
-        return self.plist(["list"])
+        return self.plist(["list"]) or {}
 
     def apfs_containers(self):
         """Returns the APFS containers as reported by ``diskutil apfs list -plist``."""
-        return (self.plist(["apfs", "list"]) or {}).get("APFSContainers") or []
+        apfs = self.plist(["apfs", "list"]) or {}
+        return first(apfs, "Containers", "APFSContainers") or []
 
-    def disk_entry(self, device):
+    def disk_entry(self, device, listing=None):
         """Returns the entry of ``diskutil list -plist`` for a whole disk, or C(None)."""
+        listing = self.disks() if listing is None else listing
         identifier = device_id(device)
-        for disk in (self.disks() or {}).get("Disks") or []:
+        for entry in listing.get("AllDisksAndPartitions") or []:
+            if isinstance(entry, dict) and entry.get("DeviceIdentifier") == identifier:
+                return entry
+        for disk in listing.get("Disks") or []:
             if disk.get("DeviceIdentifier") == identifier or disk.get("DeviceNode") == device:
                 return disk
         return None
+
+    def mounted_volumes(self, whole_disk, listing=None):
+        """Returns the identifiers of all mounted volumes that belong to a whole disk."""
+        listing = self.disks() if listing is None else listing
+        identifier = device_id(whole_disk)
+        volumes = []
+
+        def collect(parts):
+            for part in parts or []:
+                if is_mounted(part):
+                    volumes.append(device_id(part.get("DeviceIdentifier")))
+
+        stores = []
+        for entry in listing.get("AllDisksAndPartitions") or []:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("DeviceIdentifier") == identifier:
+                collect(first(entry, "PartitionMaps", "Partitions"))
+                for part in first(entry, "PartitionMaps", "Partitions") or []:
+                    if part.get("Content") in ("Apple_APFS", "Apple_CoreStorage"):
+                        stores.append(part.get("DeviceIdentifier"))
+            else:
+                stores_found = [
+                    device_id(first(store, "APFSPhysicalStore", "DeviceIdentifier"))
+                    for store in (entry.get("APFSPhysicalStores") or [])
+                ]
+                if stores_found and set(stores_found) & set(stores):
+                    collect(entry.get("APFSVolumes"))
+        return [volume for volume in volumes if volume]
 
     def find_volume(self, containers, device=None, container=None, name=None):
         """Searches an APFS volume in a list of containers as reported by ``diskutil apfs list -plist``."""
         identifier = device_id(device)
         for entry in containers:
-            reference = entry.get("APFSContainerReference")
+            reference = first(entry, "ContainerReference", "APFSContainerReference")
             if container is not None and reference != device_id(container):
                 continue
-            for volume in entry.get("APFSContainerVolumes") or []:
-                if name is not None and volume.get("APFSVolumeName") != name:
+            for volume in first(entry, "Volumes", "APFSContainerVolumes") or []:
+                if name is not None and first(volume, "Name", "APFSVolumeName") != name:
                     continue
-                if identifier is not None and volume.get("APFSVolumeDeviceIdentifier") != identifier:
+                volume_device = first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier")
+                if identifier is not None and volume_device != identifier:
                     continue
                 return reference, volume
         return None, None
@@ -617,69 +766,127 @@ class DiskUtil:
 
     def publish_info(self, info):
         """Copies the interesting values of ``diskutil info -plist`` into the result."""
+        identifier = info.get("DeviceIdentifier")
+        owners = info.get("Owners") or []
         self.result["info"] = info
-        self.result["device"] = info.get("DeviceIdentifier")
-        self.result["device_node"] = info.get("DeviceNode")
+        self.result["device"] = identifier
+        self.result["device_node"] = info.get("DeviceNode") or device_node(identifier)
+        self.result["parent_whole_disk"] = info.get("ParentWholeDisk")
         self.result["whole_disk"] = as_bool(info.get("WholeDisk"))
         self.result["volume_name"] = info.get("VolumeName")
-        self.result["volume_uuid"] = info.get("VolumeUUID")
-        self.result["volume_is_mounted"] = as_bool(info.get("Mounted"))
-        self.result["mount_point"] = info.get("MountPoint")
-        self.result["filesystem"] = info.get("FileSystemPersonality")
+        self.result["volume_uuid"] = first(info, "VolumeUUID", "DiskUUID")
+        self.result["volume_is_mounted"] = is_mounted(info)
+        self.result["mount_point"] = info.get("MountPoint") or None
+        self.result["filesystem"] = first(info, "FileSystemPersonality", "FilesystemName")
+        self.result["filesystem_type"] = info.get("FilesystemType")
         self.result["content"] = info.get("Content")
+        self.result["size"] = first(info, "Size", "IOKitSize", "DiskSize")
         self.result["volume_size"] = info.get("VolumeSize")
-        self.result["volume_free_space"] = info.get("VolumeFreeSpace")
-        self.result["disk_size"] = info.get("DiskSize")
+        self.result["free_space"] = first(info, "FreeSpace", "VolumeFreeSpace")
+        self.result["block_size"] = first(info, "DeviceBlockSize", "BlockSize")
         self.result["internal"] = as_bool(info.get("Internal"))
         self.result["ejectable"] = as_bool(info.get("Ejectable"))
+        self.result["removable_media"] = as_bool(info.get("RemovableMedia"))
         self.result["solid_state"] = as_bool(info.get("SolidState"))
+        self.result["media_name"] = info.get("MediaName")
         self.result["media_type"] = info.get("MediaType")
-        self.result["protocol"] = info.get("Protocol")
-        self.result["owners"] = info.get("Owners") or []
-        self.result["ownership_disabled"] = as_bool(info.get("OwnersDisabled"))
-        self.result["container_reference"] = info.get("APFSContainerReference") or info.get("ContainerReference")
-        self.result["apfs_group"] = info.get("APFSVolumeGroup")
-        self.result["apfs_role"] = info.get("APFSVolumeRole")
+        self.result["protocol"] = first(info, "BusProtocol", "Protocol")
+        self.result["smart_status"] = first(info, "SMARTStatus", "SmartStatus")
+        self.result["writable"] = as_bool(first(info, "Writable", "WritableVolume"))
+        self.result["read_only"] = as_bool(info.get("ReadOnlyVolume")) or (
+            "Writable" in info and not as_bool(info["Writable"])
+        )
+        self.result["encrypted"] = as_bool(first(info, "Encryption", "VolumeEncryptionEnabled"))
+        self.result["owners"] = owners
+        self.result["ownership_disabled"] = (
+            as_bool(info.get("OwnersDisabled"))
+            or ("Disabled" in owners)
+            or ("GlobalPermissionsEnabled" in info and not as_bool(info["GlobalPermissionsEnabled"]))
+        )
+        self.result["ownership_supported"] = as_bool(first(info, "SupportsGlobalPermissionsDisable", default=True))
+        self.result["container_reference"] = first(info, "APFSContainerReference", "ContainerReference")
+        self.result["apfs_group"] = first(info, "APFSVolumeGroup", "APFSVolumeGroupID")
+        self.result["apfs_role"] = first(info, "APFSVolumeRole", "Role")
 
     def unmount(self, device, force=False):
         """Unmounts a volume."""
         args = ["unmount"]
         if force:
             args.append("-force")
-        args.append(device)
+        args.append(device_id(device))
         self.run(args)
 
     # -- read-only queries ---------------------------------------------------------
+
+    def do_disks(self):
+        listing = self.disks()
+        containers = {}
+        for entry in listing.get("AllDisksAndPartitions") or []:
+            if not isinstance(entry, dict):
+                continue
+            for store in entry.get("APFSPhysicalStores") or []:
+                store_id = device_id(first(store, "APFSPhysicalStore", "DeviceIdentifier"))
+                containers.setdefault(store_id, []).extend(
+                    normalize_partition(volume) for volume in (entry.get("APFSVolumes") or [])
+                )
+        source = listing.get("Disks") or listing.get("AllDisksAndPartitions") or []
+        disks = []
+        for entry in source:
+            if not isinstance(entry, dict):
+                continue
+            volumes = []
+            for part in first(entry, "PartitionMaps", "Partitions") or []:
+                volumes.extend(containers.get(part.get("DeviceIdentifier")) or [])
+            disks.append(normalize_disk(entry, volumes))
+        self.result["disks"] = disks
+        self.result["whole_disks"] = listing.get("WholeDisks") or []
+        self.result["partitions"] = [part for disk in disks for part in disk["partitions"]]
 
     def do_info(self):
         """Runs the read-only query the user asked for."""
         info_type = self.params["info_type"]
         if info_type == "disks":
-            listing = self.disks() or {}
-            disks = [normalize_disk(disk) for disk in listing.get("Disks") or []]
-            self.result["disks"] = disks
-            self.result["whole_disks"] = listing.get("WholeDisks") or []
-            self.result["partitions"] = [part for disk in disks for part in disk["partitions"]]
+            self.do_disks()
         elif info_type == "device":
             self.require("device")
             self.publish_info(self.info(self.params["device"]))
         elif info_type == "apfs":
             self.result["containers"] = [normalize_container(entry) for entry in self.apfs_containers()]
         elif info_type == "volume_groups":
-            groups = self.plist(["apfs", "listVolumeGroups"]) or {}
-            self.result["volume_groups"] = groups.get("APFSVolumeGroups") or groups.get("VolumeGroups") or []
+            self.do_volume_groups()
         elif info_type == "filesystems":
             dummy_rc, out, dummy_err = self.run(["listFilesystems"])
-            self.result["filesystems"] = [line.strip() for line in out.splitlines() if line.strip()]
-        elif info_type == "mountinfo":
-            self.require("device")
-            self.result["mount_info"] = self.plist(["mountinfo", self.params["device"]])
+            self.result["filesystems"] = parse_filesystems(out)
+
+    def do_volume_groups(self):
+        apfs = self.plist(["apfs", "listVolumeGroups"]) or {}
+        groups = apfs.get("APFSVolumeGroups")
+        if groups is None:
+            groups = [
+                group
+                for container in first(apfs, "Containers", "APFSContainers") or []
+                for group in (container.get("VolumeGroups") or [])
+            ]
+        self.result["volume_groups"] = [
+            {
+                "uuid": group.get("APFSVolumeGroupUUID"),
+                "volumes": [
+                    {
+                        "device_identifier": volume.get("DeviceIdentifier"),
+                        "role": volume.get("Role"),
+                        "no_browse_role": as_bool(volume.get("NoBrowseRole")),
+                    }
+                    for volume in (group.get("Volumes") or [])
+                ],
+            }
+            for group in groups or []
+        ]
 
     # -- APFS volumes --------------------------------------------------------------
 
     def add_volume(self, container):
         """Creates a new APFS volume, and returns its device identifier."""
-        args = ["apfs", "addVolume", container, self.params["filesystem"], self.params["volume_name"]]
+        args = ["apfs", "addVolume", device_id(container), self.params["filesystem"], self.params["volume_name"]]
         if self.params["quota"]:
             args.extend(["-quota", self.params["quota"]])
         if self.params["reserve"]:
@@ -692,7 +899,7 @@ class DiskUtil:
         dummy_ref, volume = self.find_volume(
             self.apfs_containers(), container=container, name=self.params["volume_name"]
         )
-        return volume.get("APFSVolumeDeviceIdentifier") if volume else None
+        return first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier") if volume else None
 
     def state_present(self):
         if self.params["device"] and not self.params["volume_name"]:
@@ -708,8 +915,10 @@ class DiskUtil:
         if self.params["device"]:
             reference, volume = self.find_volume(containers, device=self.params["device"])
             if volume is not None:
-                self.result["volume_device"] = volume.get("APFSVolumeDeviceIdentifier")
-                if volume.get("APFSVolumeName") == self.params["volume_name"]:
+                self.result["volume_device"] = device_id(
+                    first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier")
+                )
+                if first(volume, "Name", "APFSVolumeName") == self.params["volume_name"]:
                     return
                 if self.params["container"] and reference != device_id(self.params["container"]):
                     self.module.fail_json(
@@ -719,7 +928,7 @@ class DiskUtil:
                 self.result["changed"] = True
                 if self.module.check_mode:
                     return
-                self.run(["rename", self.params["device"], self.params["volume_name"]])
+                self.run(["rename", device_id(self.params["device"]), self.params["volume_name"]])
                 return
             if not self.params["container"]:
                 self.module.fail_json(
@@ -731,12 +940,12 @@ class DiskUtil:
             containers, container=self.params["container"], name=self.params["volume_name"]
         )
         if volume is not None:
-            self.result["volume_device"] = volume.get("APFSVolumeDeviceIdentifier")
+            self.result["volume_device"] = device_id(first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier"))
             return
         self.result["changed"] = True
         if self.module.check_mode:
             return
-        self.result["volume_device"] = self.add_volume(device_id(self.params["container"]))
+        self.result["volume_device"] = self.add_volume(self.params["container"])
 
     def state_absent(self):
         if not self.params["device"] and not (self.params["container"] and self.params["volume_name"]):
@@ -752,11 +961,11 @@ class DiskUtil:
         )
         if volume is None:
             return
-        self.result["volume_device"] = volume.get("APFSVolumeDeviceIdentifier")
+        self.result["volume_device"] = device_id(first(volume, "DeviceIdentifier", "APFSVolumeDeviceIdentifier"))
         self.result["changed"] = True
         if self.module.check_mode:
             return
-        self.run(["apfs", "deleteVolume", volume.get("APFSVolumeDeviceIdentifier")])
+        self.run(["apfs", "deleteVolume", self.result["volume_device"]])
 
     # -- mount state ---------------------------------------------------------------
 
@@ -774,7 +983,7 @@ class DiskUtil:
         args = ["mount"]
         if wanted:
             args.extend(["-mountPoint", wanted])
-        args.append(self.params["device"])
+        args.append(device_id(self.params["device"]))
         self.run(args)
 
     def state_unmounted(self):
@@ -787,58 +996,66 @@ class DiskUtil:
         self.unmount(self.params["device"], force=self.params["force"])
 
     def state_ejected(self):
-        disk = self.disk_entry(self.params["device"])
-        if disk is None:
+        listing = self.disks()
+        if self.disk_entry(self.params["device"], listing) is None:
             # The disk is not in the partition table anymore, so there is nothing left to eject.
             return
-        partitions = disk.get("PartitionMaps") or []
-        if not partitions:
+        mounted = self.mounted_volumes(self.params["device"], listing)
+        if not mounted:
             return
-        mounted = [part.get("DeviceIdentifier") for part in partitions if as_bool(part.get("Mounted"))]
         self.result["changed"] = True
         if self.module.check_mode:
             return
-        for device in mounted:
-            self.unmount(device, force=self.params["force"])
+        for volume in mounted:
+            self.unmount(volume, force=self.params["force"])
         args = ["eject"]
         if self.params["force"]:
             args.append("-force")
-        args.append(self.params["device"])
+        args.append(device_id(self.params["device"]))
         self.run(args)
 
     # -- ownership -----------------------------------------------------------------
 
     def state_ownership(self):
         self.publish_info(self.info(self.params["device"]))
-        owners = self.result["owners"]
-        if "Disabled" in owners or self.result["ownership_disabled"]:
-            enabled = False
-        else:
-            # This covers both "Enabled" and the case where diskutil does not report ownership at all,
-            # in which case the default applies.
-            enabled = True
+        if not self.result["ownership_supported"]:
+            self.module.fail_json(
+                msg=f"Ownership cannot be disabled on the volume '{self.params['device']}' on this system",
+            )
+        enabled = not self.result["ownership_disabled"]
         if enabled == (self.params["state"] == "owned"):
             return
         self.result["changed"] = True
         if self.module.check_mode:
             return
-        self.run(["enableOwnership" if not enabled else "disableOwnership", self.params["device"]])
+        self.run(["enableOwnership" if not enabled else "disableOwnership", device_id(self.params["device"])])
 
     # -- erase ---------------------------------------------------------------------
 
     def disk_already_erased(self, name):
-        """Returns whether a whole disk already consists of the requested volume, and nothing else."""
-        disk = self.disk_entry(self.params["device"])
+        """Returns whether a whole disk consists of the requested volume, and nothing else."""
+        listing = self.disks()
+        disk = self.disk_entry(self.params["device"], listing)
         if disk is None:
             return True
-        # `diskutil eraseDisk` creates the requested volume, plus one EFI partition for a GPT disk.
-        partitions = [part for part in disk.get("PartitionMaps") or [] if part.get("Content") != "EFI"]
-        if len(partitions) != 1:
+        stores = [
+            part.get("DeviceIdentifier")
+            for part in (first(disk, "PartitionMaps", "Partitions") or [])
+            if part.get("Content") != "EFI"
+        ]
+        if len(stores) != 1:
             return False
-        partition = partitions[0]
-        return (
-            partition.get("FileSystemPersonality") == self.params["filesystem"] and partition.get("VolumeName") == name
-        )
+        for entry in listing.get("AllDisksAndPartitions") or []:
+            if not isinstance(entry, dict):
+                continue
+            found = [
+                device_id(first(store, "APFSPhysicalStore", "DeviceIdentifier"))
+                for store in (entry.get("APFSPhysicalStores") or [])
+            ]
+            if stores[0] in found:
+                volumes = entry.get("APFSVolumes") or []
+                return len(volumes) == 1 and volumes[0].get("VolumeName") == name
+        return False
 
     def state_erased(self):
         if not self.params["erase_confirm"]:
@@ -852,7 +1069,8 @@ class DiskUtil:
             self.publish_info(info)
             name = name or info.get("VolumeName") or "Untitled"
             unchanged = (
-                info.get("FileSystemPersonality") == self.params["filesystem"] and info.get("VolumeName") == name
+                first(info, "FileSystemPersonality", "FilesystemName") == self.params["filesystem"]
+                and info.get("VolumeName") == name
             )
         else:
             name = name or "Untitled"
@@ -863,7 +1081,7 @@ class DiskUtil:
         if self.module.check_mode:
             return
         args = ["eraseDisk" if self.params["erase_scope"] == "disk" else "eraseVolume"]
-        args.extend([self.params["filesystem"], name, self.params["device"]])
+        args.extend([self.params["filesystem"], name, device_id(self.params["device"])])
         if self.params["erase_scope"] == "disk" and self.params["partition_scheme"]:
             args.append(self.params["partition_scheme"])
         self.run(args)
@@ -873,11 +1091,11 @@ class DiskUtil:
     def do_state(self):
         """Runs the state change the user asked for."""
         state = self.params["state"]
-        if state in MOUNT_STATES or state in OWNERSHIP_STATES or state in ("ejected", "erased"):
+        if state not in ("present", "absent"):
             self.require("device")
 
         if self.module._diff and self.params["device"]:
-            self.result["before"] = self.info_or_none(self.params["device"])
+            self.result["before"] = self.info(self.params["device"], allow_failure=True)
 
         if state == "present":
             self.state_present()
@@ -895,7 +1113,7 @@ class DiskUtil:
             self.state_erased()
 
         if self.module._diff and self.params["device"]:
-            self.result["after"] = self.info_or_none(self.params["device"])
+            self.result["after"] = self.info(self.params["device"], allow_failure=True)
 
 
 def main():
@@ -905,10 +1123,7 @@ def main():
                 type="str",
                 choices=["present", "absent", "mounted", "unmounted", "ejected", "owned", "unowned", "erased"],
             ),
-            info_type=dict(
-                type="str",
-                choices=["disks", "device", "apfs", "volume_groups", "filesystems", "mountinfo"],
-            ),
+            info_type=dict(type="str", choices=["disks", "device", "apfs", "volume_groups", "filesystems"]),
             device=dict(type="str"),
             container=dict(type="str"),
             volume_name=dict(type="str"),

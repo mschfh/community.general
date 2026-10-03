@@ -2,10 +2,18 @@
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+- name: Unmount the volume of the container
+  ansible.builtin.include_tasks: ../idempotent.yml
+  vars:
+    diskutil_test_params:
+      state: unmounted
+      device: "{{ diskutil_test_container_volume }}"
+    diskutil_test_expect_changed: true
+
 - name: Try to erase a volume without confirming it
   community.general.diskutil:
     state: erased
-    device: "{{ diskutil_test_container }}"
+    device: "{{ diskutil_test_container_volume }}"
     volume_name: "{{ diskutil_test_scratch_volume }}"
   become: true
   register: diskutil_test_erase_unconfirmed
@@ -23,7 +31,7 @@
   vars:
     diskutil_test_params:
       state: erased
-      device: "{{ diskutil_test_container }}"
+      device: "{{ diskutil_test_container_volume }}"
       volume_name: "{{ diskutil_test_scratch_volume }}"
       filesystem: APFS
       erase_confirm: true
@@ -32,7 +40,7 @@
 - name: Get the information of the erased volume
   community.general.diskutil:
     info_type: device
-    device: "{{ diskutil_test_container }}"
+    device: "{{ diskutil_test_container_volume }}"
   become: true
   register: diskutil_test_erase_info
 

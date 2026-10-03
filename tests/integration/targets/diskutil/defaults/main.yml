@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The tests work on a throwaway sparse disk image, so they never touch a real disk of the host.
-# `hdiutil create -type SPARSE` appends `.sparseimage` to the given path, so the path of the disk image
-# is determined from the output of `hdiutil create` in `tasks/setup.yml`.
+# `hdiutil create -type SPARSE` appends `.sparseimage` to the given path, and it gives the image an EFI
+# partition and an APFS container. The devices are determined in `tasks/setup.yml`.
 diskutil_test_image_size: 4096m
 diskutil_test_image_base: "/tmp/diskutil-test-{{ inventory_hostname }}-{{ ansible_date_time.epoch }}.dmg"
 # The mount points are not placed under /tmp, because diskutil reports the resolved path of a mount point,

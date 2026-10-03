@@ -55,9 +55,9 @@
       mount_point: "{{ diskutil_test_mount_point }}"
     diskutil_test_expect_changed: true
 
-- name: Get the mount information of the volume
+- name: Get the information of the volume at its mount point
   community.general.diskutil:
-    info_type: mountinfo
+    info_type: device
     device: "{{ diskutil_test_mount_device }}"
   become: true
   register: diskutil_test_mount_info_custom
@@ -65,7 +65,8 @@
 - name: Assert the mount point of the volume
   ansible.builtin.assert:
     that:
-      - diskutil_test_mount_info_custom.mount_info.MountPoint == diskutil_test_mount_point
+      - diskutil_test_mount_info_custom.volume_is_mounted
+      - diskutil_test_mount_info_custom.mount_point == diskutil_test_mount_point
 
 - name: Moving the volume to another mount point is not a no-op
   ansible.builtin.include_tasks: ../idempotent.yml

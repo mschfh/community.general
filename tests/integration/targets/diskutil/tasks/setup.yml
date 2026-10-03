@@ -2,9 +2,9 @@
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-- name: Create a sparse APFS disk image
+- name: Create a sparse disk image
   ansible.builtin.command:
-    cmd: "hdiutil create -size {{ diskutil_test_image_size }} -type SPARSE -fs APFS {{ diskutil_test_image_base }}"
+    cmd: "hdiutil create -size {{ diskutil_test_image_size }} -type SPARSE {{ diskutil_test_image_base }}"
   become: true
   changed_when: true
   register: diskutil_test_create
@@ -20,12 +20,29 @@
   changed_when: true
   register: diskutil_test_attach
 
-- name: Determine the devices of the attached disk image
+- name: Determine the whole disk and the APFS physical store of the attached disk image
   ansible.builtin.set_fact:
-    # `hdiutil attach` prints the whole disk first, followed by one line per partition.
+    # `hdiutil attach` prints the whole disk first, followed by one line per partition, followed by
+    # one line for the synthesized disk of every APFS container.
     diskutil_test_disk_node: "{{ diskutil_test_attach.stdout_lines[0].split()[0] }}"
     diskutil_test_disk: "{{ diskutil_test_attach.stdout_lines[0].split()[0] | basename }}"
-    diskutil_test_container: "{{ (diskutil_test_attach.stdout_lines | select('search', 'Apple_APFS') | first).split()[0] | basename }}"
+    diskutil_test_store: "{{ (diskutil_test_attach.stdout_lines | select('search', 'Apple_APFS') | first).split()[0] | basename }}"
+
+- name: List the APFS containers
+  community.general.diskutil:
+    info_type: apfs
+  become: true
+  register: diskutil_test_containers
+
+- name: Find the APFS container that uses our physical store
+  ansible.builtin.set_fact:
+    diskutil_test_container_entry: >-
+      {{ diskutil_test_containers.containers | selectattr('physical_stores', 'contains', diskutil_test_store) | first }}
+
+- name: Remember the APFS container and its volume
+  ansible.builtin.set_fact:
+    diskutil_test_container: "{{ diskutil_test_container_entry.reference }}"
+    diskutil_test_container_volume: "{{ diskutil_test_container_entry.volumes[0].device_identifier }}"
 
 - name: Verify that the disk image was attached
   ansible.builtin.assert:
@@ -33,11 +50,14 @@
       - diskutil_test_create.rc == 0
       - diskutil_test_attach.rc == 0
       - diskutil_test_disk is match('^disk[0-9]+$')
-      - diskutil_test_container is match('^disk[0-9]+s[0-9]+$')
+      - diskutil_test_container is match('^disk[0-9]+$')
+      - diskutil_test_container_volume is match('^disk[0-9]+s[0-9]+$')
     fail_msg: >-
-      hdiutil did not report a whole disk and an APFS volume:
+      hdiutil did not report a disk with an APFS container, or the container has no volume:
       {{ diskutil_test_attach.stdout_lines }}
-    success_msg: "Using {{ diskutil_test_disk }} with the APFS container {{ diskutil_test_container }}"
+    success_msg: >-
+      Using the disk {{ diskutil_test_disk }} with the APFS container {{ diskutil_test_container }}
+      and its volume {{ diskutil_test_container_volume }}
 
 - name: Create the mount points used by the tests
   ansible.builtin.file:
