@@ -1,0 +1,130 @@
+Configured locale: en_US.UTF-8
+Loaded configuration: tests/config.yml
+Creating container database.
+Unit test modules with Python 3.12
+Initializing "/tmp/ansible-test-d_0o1szx-injector" as the temporary injector directory.
+Injecting "/tmp/python-z8bgq6n8-ansible/python" as a execv wrapper for the "/Users/runner/hostedtoolcache/Python/3.12.10/arm64/bin/python" interpreter.
+Stream command: pytest -r a -n auto --color no -p no:cacheprovider -c /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/ansible_test/_data/pytest/config/default.ini --junit-xml /Users/runner/work/community.general/community.general/ansible_collections/community/general/tests/output/junit/python3.12-modules-units.xml --strict-markers --rootdir /Users/runner/work/community.general/community.general/ansible_collections/community/general --confcutdir /Users/runner/work/community.general/community.general/ansible_collections/community/general -v tests/unit/plugins/modules/test_diskutil.py
+============================= test session starts ==============================
+platform darwin -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- /Library/Frameworks/Python.framework/Versions/3.12/bin/python
+rootdir: /Users/runner/work/community.general/community.general/ansible_collections/community/general
+configfile: ../../../../../../../../Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/ansible_test/_data/pytest/config/default.ini
+plugins: mock-3.16.0, xdist-3.8.0
+created: 3/3 workers
+3 workers [55 items]
+
+scheduling tests via LoadScheduling
+
+tests/unit/plugins/modules/test_diskutil.py::test_missing_input 
+tests/unit/plugins/modules/test_diskutil.py::test_info_device 
+tests/unit/plugins/modules/test_diskutil.py::test_info_device_without_device 
+[gw0] [  1%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_missing_input 
+tests/unit/plugins/modules/test_diskutil.py::test_state_and_info_type_are_mutually_exclusive 
+[gw1] [  3%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_device 
+tests/unit/plugins/modules/test_diskutil.py::test_info_device_by_device_node 
+[gw2] [  5%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_device_without_device 
+tests/unit/plugins/modules/test_diskutil.py::test_info_apfs 
+[gw2] [  7%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_apfs 
+tests/unit/plugins/modules/test_diskutil.py::test_info_apfs_old_schema 
+[gw0] [  9%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_state_and_info_type_are_mutually_exclusive 
+tests/unit/plugins/modules/test_diskutil.py::test_info_disks 
+[gw1] [ 10%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_device_by_device_node 
+tests/unit/plugins/modules/test_diskutil.py::test_info_whole_disk 
+[gw2] [ 12%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_apfs_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_info_volume_groups 
+[gw0] [ 14%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_disks 
+tests/unit/plugins/modules/test_diskutil.py::test_info_disks_old_schema 
+[gw1] [ 16%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_whole_disk 
+tests/unit/plugins/modules/test_diskutil.py::test_info_device_old_schema 
+[gw2] [ 18%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_volume_groups 
+tests/unit/plugins/modules/test_diskutil.py::test_info_filesystems 
+[gw1] [ 20%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_device_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_unmounted_old_schema 
+[gw2] [ 21%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_filesystems 
+tests/unit/plugins/modules/test_diskutil.py::test_mounted_noop 
+[gw2] [ 23%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_mounted_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_requested_mount_point 
+[gw0] [ 25%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_info_disks_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_another_mount_point_check_mode 
+[gw1] [ 27%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unmounted_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_ejected 
+[gw2] [ 29%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_requested_mount_point 
+[gw0] [ 30%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_another_mount_point_check_mode 
+[gw1] [ 32%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_ejected 
+tests/unit/plugins/modules/test_diskutil.py::test_ejected_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_unmounted_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_mounted_without_mount_point 
+[gw0] [ 34%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unmounted_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_unmounted 
+[gw2] [ 36%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_mounted_without_mount_point 
+[gw1] [ 38%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_ejected_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_another_mount_point 
+tests/unit/plugins/modules/test_diskutil.py::test_ejected_disk_not_attached 
+[gw0] [ 40%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unmounted 
+tests/unit/plugins/modules/test_diskutil.py::test_unmounted_force 
+[gw2] [ 41%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_mounted_at_another_mount_point 
+[gw1] [ 43%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_ejected_disk_not_attached 
+tests/unit/plugins/modules/test_diskutil.py::test_unowned_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_owned_noop 
+[gw0] [ 45%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unmounted_force 
+tests/unit/plugins/modules/test_diskutil.py::test_present_create 
+[gw2] [ 47%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_owned_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_owned 
+[gw1] [ 49%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unowned_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_owned_old_schema 
+[gw0] [ 50%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_create 
+tests/unit/plugins/modules/test_diskutil.py::test_present_create_with_quota_without_mount 
+[gw2] [ 52%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_owned 
+tests/unit/plugins/modules/test_diskutil.py::test_unowned 
+[gw1] [ 54%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_owned_old_schema 
+tests/unit/plugins/modules/test_diskutil.py::test_ownership_not_supported 
+[gw0] [ 56%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_create_with_quota_without_mount 
+tests/unit/plugins/modules/test_diskutil.py::test_present_noop 
+[gw2] [ 58%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_unowned 
+tests/unit/plugins/modules/test_diskutil.py::test_owned_noop_old_schema 
+[gw1] [ 60%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_ownership_not_supported 
+tests/unit/plugins/modules/test_diskutil.py::test_present_rename 
+[gw0] [ 61%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_present_create_check_mode 
+[gw2] [ 63%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_owned_noop_old_schema 
+[gw1] [ 65%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_rename 
+tests/unit/plugins/modules/test_diskutil.py::test_present_rename_check_mode 
+tests/unit/plugins/modules/test_diskutil.py::test_present_rename_noop 
+[gw0] [ 67%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_create_check_mode 
+tests/unit/plugins/modules/test_diskutil.py::test_present_without_container 
+[gw2] [ 69%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_rename_check_mode 
+tests/unit/plugins/modules/test_diskutil.py::test_present_without_volume_name 
+[gw1] [ 70%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_rename_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_present_with_unknown_device 
+[gw0] [ 72%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_without_container 
+tests/unit/plugins/modules/test_diskutil.py::test_absent 
+[gw2] [ 74%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_without_volume_name 
+tests/unit/plugins/modules/test_diskutil.py::test_absent_noop 
+[gw1] [ 76%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_present_with_unknown_device 
+tests/unit/plugins/modules/test_diskutil.py::test_absent_without_options 
+[gw0] [ 78%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_absent 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_without_confirm 
+[gw2] [ 80%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_absent_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_noop 
+[gw1] [ 81%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_absent_without_options 
+tests/unit/plugins/modules/test_diskutil.py::test_erased 
+[gw0] [ 83%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_without_confirm 
+[gw2] [ 85%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_without_volume_name 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_disk_noop 
+[gw1] [ 87%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_disk 
+[gw2] [ 89%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_disk_noop 
+tests/unit/plugins/modules/test_diskutil.py::test_diff_mode 
+[gw0] [ 90%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_without_volume_name 
+tests/unit/plugins/modules/test_diskutil.py::test_erased_disk_check_mode 
+[gw1] [ 92%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_disk 
+tests/unit/plugins/modules/test_diskutil.py::test_command_failure 
+[gw2] [ 94%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_diff_mode 
+tests/unit/plugins/modules/test_diskutil.py::test_invalid_plist_output 
+[gw0] [ 96%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_erased_disk_check_mode 
+[gw1] [ 98%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_command_failure 
+[gw2] [100%] PASSED tests/unit/plugins/modules/test_diskutil.py::test_invalid_plist_output 
+
+- generated xml file: /Users/runner/work/community.general/community.general/ansible_collections/community/general/tests/output/junit/python3.12-modules-units.xml -
+============================== 55 passed in 2.06s ==============================

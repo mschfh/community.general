@@ -1,0 +1,46 @@
+--- tests/output/data/integration-2026-10-03-13-28-48.json ---
+{
+    "targets": {
+        "diskutil": {
+            "aliases": [
+                "azp/", 
+                "azp/diskutil", 
+                "azp/posix/", 
+                "azp/posix/1/", 
+                "azp/posix/1/diskutil", 
+                "azp/posix/diskutil", 
+                "context//", 
+                "context//diskutil", 
+                "context/target/", 
+                "context/target/diskutil", 
+                "destructive/", 
+                "destructive/diskutil", 
+                "diskutil", 
+                "module/", 
+                "module/diskutil/", 
+                "module/diskutil/diskutil", 
+                "needs/", 
+                "needs/root/", 
+                "needs/root/diskutil", 
+                "posix/", 
+                "role/", 
+                "role/diskutil", 
+                "skip/", 
+                "skip/docker/", 
+                "skip/docker/diskutil", 
+                "skip/freebsd/", 
+                "skip/freebsd/diskutil", 
+                "skip/rhel/", 
+                "skip/rhel/diskutil"
+            ], 
+            "modules": [
+                "diskutil"
+            ], 
+            "name": "diskutil", 
+            "run_time_seconds": 158, 
+            "setup_always": [], 
+            "setup_once": [], 
+            "type": "role"
+        }
+    }
+}
