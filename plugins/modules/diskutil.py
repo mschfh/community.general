@@ -666,11 +666,8 @@ class DiskUtil:
             )
         return rc, out, err
 
-    def plist(self, args, allow_failure=False):
-        """Runs a ``diskutil`` command with ``-plist``, and returns the parsed property list."""
-        rc, out, err = self.run(args + ["-plist"], allow_failure=allow_failure)
-        if rc != 0:
-            return None
+    def parse_plist(self, out, args, err, allow_failure=False):
+        """Parses the output of a ``diskutil`` command that was called with ``-plist``."""
         try:
             return sanitize(plistlib.loads(to_bytes(out)))
         except Exception as exc:
@@ -682,9 +679,23 @@ class DiskUtil:
                 stderr=err,
             )
 
+    def plist(self, args, allow_failure=False):
+        """Runs a ``diskutil`` command with ``-plist``, and returns the parsed property list."""
+        rc, out, err = self.run(args + ["-plist"], allow_failure=allow_failure)
+        if rc != 0:
+            return None
+        return self.parse_plist(out, args, err, allow_failure)
+
     def info(self, device, allow_failure=False):
-        """Returns the parsed output of ``diskutil info -plist`` for a device."""
-        return self.plist(["info", device_id(device)], allow_failure=allow_failure)
+        """Returns the parsed output of ``diskutil info -plist`` for a device.
+
+        Unlike the other verbs, C(diskutil info) expects the C(-plist) flag before the device.
+        """
+        identifier = device_id(device)
+        rc, out, err = self.run(["info", "-plist", identifier], allow_failure=allow_failure)
+        if rc != 0:
+            return None
+        return self.parse_plist(out, ["info", identifier], err, allow_failure)
 
     def disks(self):
         """Returns the parsed output of ``diskutil list -plist``."""

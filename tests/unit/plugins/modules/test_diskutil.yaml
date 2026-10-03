@@ -1984,8 +1984,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2003,8 +2003,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2026,8 +2026,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk7
       - -plist
+      - disk7
       environ: *env
       rc: 0
       out: *info_whole_disk
@@ -2061,8 +2061,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk0s1
       - -plist
+      - disk0s1
       environ: *env
       rc: 0
       out: *info_old
@@ -2153,8 +2153,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2172,8 +2172,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2189,8 +2189,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_unmounted
@@ -2215,8 +2215,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2253,8 +2253,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2271,8 +2271,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_unmounted
@@ -2288,8 +2288,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2314,8 +2314,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -2340,8 +2340,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk0s1
       - -plist
+      - disk0s1
       environ: *env
       rc: 0
       out: *info_old
@@ -2438,8 +2438,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_owned
@@ -2456,8 +2456,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_unowned
@@ -2481,8 +2481,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_owned
@@ -2509,8 +2509,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk0s1
       - -plist
+      - disk0s1
       environ: *env
       rc: 0
       out: *info_old
@@ -2526,8 +2526,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk0s1
       - -plist
+      - disk0s1
       environ: *env
       rc: 0
       out: *info_old
@@ -2552,8 +2552,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk0s1
       - -plist
+      - disk0s1
       environ: *env
       rc: 0
       out: *info_old_unowned
@@ -2578,8 +2578,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk7
       - -plist
+      - disk7
       environ: *env
       rc: 0
       out: *info_whole_disk
@@ -2891,8 +2891,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_named
@@ -2910,8 +2910,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_unmounted
@@ -2938,8 +2938,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_hfs
@@ -3043,8 +3043,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -3052,8 +3052,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_mounted
@@ -3069,8 +3069,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: *info_unmounted
@@ -3088,8 +3088,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk9
       - -plist
+      - disk9
       environ: *env
       rc: 1
       out: ''
@@ -3105,8 +3105,8 @@ test_cases:
     - command:
       - /testbin/diskutil
       - info
-      - disk8s1
       - -plist
+      - disk8s1
       environ: *env
       rc: 0
       out: 'this is not a property list
