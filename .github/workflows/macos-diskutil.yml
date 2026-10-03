@@ -163,99 +163,53 @@ jobs:
             --python-interpreter "$(command -v python)" -v 2>&1 | tee /tmp/integration.log
         working-directory: ${{ env.COLLECTION_ROOT }}
 
-      - name: Collect the plist output of diskutil
+      - name: Probe how to create an APFS container on a disk image
         if: always()
         shell: bash
         run: |
-          mkdir -p ci-output/plists
-          sw_vers > ci-output/platform.txt 2>&1 || true
-          {
-            echo "### diskutil listFilesystems"
-            diskutil listFilesystems
-            echo "### diskutil list"
-            diskutil list
-          } >> ci-output/platform.txt 2>&1 || true
-
           WORK=$(mktemp -d)
-          sudo hdiutil create -size 4096m -type SPARSE -fs APFS "$WORK/diag.dmg" >> ci-output/platform.txt 2>&1 || true
-          OUT=$(sudo hdiutil attach -nomount "$WORK/diag.dmg.sparseimage" 2>&1 || true)
-          echo "$OUT" >> ci-output/platform.txt
-          DEV=$(echo "$OUT" | head -1 | awk '{print $1}')
-          STORE=$(echo "$OUT" | grep Apple_APFS | head -1 | awk '{print $1}')
-          CONT=$(echo "$OUT" | grep EF57347C | head -1 | awk '{print $1}')
-          VOL=$(echo "$OUT" | grep 41504653 | head -1 | awk '{print $1}')
-          {
-            echo "whole disk: $DEV"
-            echo "physical store: $STORE"
-            echo "apfs container: $CONT"
-            echo "container volume: $VOL"
-          } >> ci-output/platform.txt
-
-          dump() {
-            echo "### $*"
-            sudo "$@" >> ci-output/platform.txt 2>&1 || true
+          probe() {
+            echo "########## PROBE: $1"
+            shift
+            "$@" 2>&1 || true
           }
-          dump_plain() {
-            echo "### $*"
-            "$@" >> ci-output/platform.txt 2>&1 || true
+          attach() {
+            # echoes "<whole disk> <apfs container> <container volume>"
+            OUT=$(sudo hdiutil attach -nomount "$1" 2>&1 || true)
+            echo "$OUT"
+            DEV=$(echo "$OUT" | head -1 | awk '{print $1}')
+            CONT=$(echo "$OUT" | grep EF57347C | head -1 | awk '{print $1}')
+            VOL=$(echo "$OUT" | grep 41504653 | head -1 | awk '{print $1}')
+            echo "PROBE-RESULT dev=$DEV cont=$CONT vol=$VOL"
           }
-          snap() {
-            echo "### $1"
-            diskutil info -plist "$2" > "ci-output/plists/$1" 2>&1 || true
+          find_container() {
+            # finds the APFS container that uses the given physical store
+            diskutil apfs list -plist | grep -A3 "$1" | grep -m1 ContainerReference | sed 's/.*<string>\(.*\)<\/string>.*/\1/'
           }
 
-          diskutil list -plist > ci-output/plists/list.xml 2>&1 || true
-          diskutil apfs list -plist > ci-output/plists/apfs-list.xml 2>&1 || true
-          diskutil apfs listVolumeGroups -plist > ci-output/plists/apfs-volume-groups.xml 2>&1 || true
-          snap info-whole-disk.xml "$DEV"
-          snap info-store.xml "$STORE"
-          snap info-container-volume-mounted.xml "$VOL"
-          snap info-container-disk.xml "$CONT"
+          probe "A: hdiutil -fs APFS" sudo hdiutil create -size 4096m -type SPARSE -fs APFS "$WORK/a.dmg"
+          probe "attach A" attach "$WORK/a.dmg.sparseimage"
+          probe "A: apfs addVolume on the synthesized container" sudo diskutil apfs addVolume disk8 APFS DiagVolA
+          probe "A: apfs addVolume on the physical store" sudo diskutil apfs addVolume disk7s1 APFS DiagVolA2
 
-          dump diskutil mount "$VOL"
-          snap info-container-volume-remounted.xml "$VOL"
-          dump diskutil disableOwnership "$VOL"
-          snap info-container-volume-unowned.xml "$VOL"
-          dump diskutil enableOwnership "$VOL"
-          snap info-container-volume-owned.xml "$VOL"
+          probe "B: raw image without -fs" sudo hdiutil create -size 4096m -type SPARSE "$WORK/b.dmg"
+          probe "attach B" attach "$WORK/b.dmg.sparseimage"
+          probe "B: list" diskutil list
+          probe "B: partitionDisk GPT APFS" sudo diskutil partitionDisk disk9 GPT APFS APFSC
+          probe "B: list" diskutil list
+          probe "B: find container" find_container disk9s1
+          probe "B: apfs addVolume" sudo diskutil apfs addVolume "$(find_container disk9s1)" APFS DiagVolB
+          probe "B: apfs list" diskutil apfs list
 
-          dump diskutil unmount "$VOL"
-          snap info-container-volume-unmounted.xml "$VOL"
-          dump_plain diskutil info "$VOL"
-          dump_plain diskutil list
-          dump_plain diskutil apfs listVolumeGroups
-          dump_plain diskutil mount
-          echo "### diskutil help verbs" >> ci-output/platform.txt
-          diskutil 2>&1 | head -80 >> ci-output/platform.txt || true
+          probe "C: eraseDisk on the hdiutil image" sudo diskutil eraseDisk APFS APFSC GPT disk7
+          probe "C: list" diskutil list
+          probe "C: find container" find_container disk7s1
+          probe "C: apfs addVolume" sudo diskutil apfs addVolume "$(find_container disk7s1)" APFS DiagVolC
+          probe "C: apfs list" diskutil apfs list
 
-          dump diskutil apfs addVolume "$CONT" APFS DiagVol
-          diskutil apfs list -plist > ci-output/plists/apfs-list-after-add.xml 2>&1 || true
-          diskutil list -plist > ci-output/plists/list-after-add.xml 2>&1 || true
-          NEW=$(diskutil apfs list -plist | grep -B4 -A6 '<string>DiagVol</string>' | grep -A2 DeviceIdentifier | grep '<string>' | head -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          echo "new volume: $NEW" >> ci-output/platform.txt
-          snap info-new-volume.xml "$NEW"
-          dump diskutil apfs listVolumeGroups
-          dump diskutil rename "$NEW" DiagVolRenamed
-          diskutil apfs list -plist > ci-output/plists/apfs-list-after-rename.xml 2>&1 || true
-          snap info-new-volume-renamed.xml "$NEW"
-
-          echo "### unmount the new volume" >> ci-output/platform.txt
-          sudo diskutil unmount "$NEW" >> ci-output/platform.txt 2>&1 || true
-          snap info-new-volume-unmounted.xml "$NEW"
-          echo "### eraseVolume the new volume" >> ci-output/platform.txt
-          sudo diskutil eraseVolume APFS DiagErase "$NEW" >> ci-output/platform.txt 2>&1 || true
-          snap info-new-volume-erased.xml "$NEW"
-          echo "### eraseVolume the container volume" >> ci-output/platform.txt
-          sudo diskutil eraseVolume APFS DiagEraseContainer "$VOL" >> ci-output/platform.txt 2>&1 || true
-          snap info-container-volume-erased.xml "$VOL"
-          diskutil list -plist > ci-output/plists/list-after-erase-volume.xml 2>&1 || true
-
-          echo "### eraseDisk" >> ci-output/platform.txt
-          sudo diskutil eraseDisk APFS DiagEraseDisk GPT "$DEV" >> ci-output/platform.txt 2>&1 || true
-          diskutil list -plist > ci-output/plists/list-after-erase-disk.xml 2>&1 || true
-          diskutil apfs list -plist > ci-output/plists/apfs-list-after-erase-disk.xml 2>&1 || true
-          echo "### detach" >> ci-output/platform.txt
-          sudo hdiutil detach -force "$DEV" >> ci-output/platform.txt 2>&1 || true
+          probe "detach" sudo hdiutil detach -force disk7
+          probe "detach b" sudo hdiutil detach -force disk9
+          rm -rf "$WORK"
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Verify that the tests really ran
