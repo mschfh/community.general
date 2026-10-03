@@ -3001,8 +3001,8 @@ test_cases:
       - eraseDisk
       - APFS
       - DiagEraseDisk
-      - disk7
       - GPT
+      - disk7
       environ: *env
       rc: 0
       out: Erasing disk7

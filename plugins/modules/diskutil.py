@@ -1092,9 +1092,11 @@ class DiskUtil:
         if self.module.check_mode:
             return
         args = ["eraseDisk" if self.params["erase_scope"] == "disk" else "eraseVolume"]
-        args.extend([self.params["filesystem"], name, device_id(self.params["device"])])
+        args.extend([self.params["filesystem"], name])
+        # `diskutil eraseDisk` expects the partition scheme before the device.
         if self.params["erase_scope"] == "disk" and self.params["partition_scheme"]:
             args.append(self.params["partition_scheme"])
+        args.append(device_id(self.params["device"]))
         self.run(args)
 
     # -- entry point ---------------------------------------------------------------
