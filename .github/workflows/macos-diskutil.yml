@@ -167,7 +167,10 @@ jobs:
         if: always()
         shell: bash
         run: |
+          set -o pipefail
+          main() {
           WORK=$(mktemp -d)
+          mkdir -p ci-output
           probe() {
             echo "########## PROBE: $1"
             shift
@@ -210,6 +213,8 @@ jobs:
           probe "detach" sudo hdiutil detach -force disk7
           probe "detach b" sudo hdiutil detach -force disk9
           rm -rf "$WORK"
+          }
+          main 2>&1 | tee ci-output/probe.txt
         working-directory: ${{ env.COLLECTION_ROOT }}
 
       - name: Verify that the tests really ran
