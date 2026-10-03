@@ -177,7 +177,7 @@ jobs:
           } >> ci-output/platform.txt 2>&1 || true
 
           WORK=$(mktemp -d)
-          sudo hdiutil create -size 256m -type SPARSE -fs APFS "$WORK/diag.dmg" >> ci-output/platform.txt 2>&1 || true
+          sudo hdiutil create -size 512m -type SPARSE -fs APFS "$WORK/diag.dmg" >> ci-output/platform.txt 2>&1 || true
           OUT=$(sudo hdiutil attach -nomount "$WORK/diag.dmg.sparseimage" 2>&1 || true)
           echo "$OUT" >> ci-output/platform.txt
           DEV=$(echo "$OUT" | head -1 | awk '{print $1}')
@@ -192,6 +192,10 @@ jobs:
           } >> ci-output/platform.txt
 
           dump() {
+            echo "### $*"
+            sudo "$@" >> ci-output/platform.txt 2>&1 || true
+          }
+          dump_plain() {
             echo "### $*"
             "$@" >> ci-output/platform.txt 2>&1 || true
           }
@@ -217,6 +221,12 @@ jobs:
           snap info-container-volume-unmounted.xml "$VOL"
           dump diskutil mount "$VOL"
           snap info-container-volume-remounted.xml "$VOL"
+          dump_plain diskutil info "$VOL"
+          dump_plain diskutil list
+          dump_plain diskutil apfs listVolumeGroups
+          dump_plain diskutil mount
+          echo "### diskutil help verbs" >> ci-output/platform.txt
+          diskutil 2>&1 | head -80 >> ci-output/platform.txt || true
 
           dump diskutil apfs addVolume "$CONT" APFS DiagVol
           diskutil apfs list -plist > ci-output/plists/apfs-list-after-add.xml 2>&1 || true
