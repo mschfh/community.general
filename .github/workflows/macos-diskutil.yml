@@ -167,97 +167,82 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set +e
           WORK=$(mktemp -d)
           mkdir -p ci-output/plists
-          exec > >(tee ci-output/battery.txt) 2>&1
-
-          snap() { diskutil info -plist "$2" > "ci-output/plists/$1" 2>&1; echo "snap $1 rc=$?"; }
-          note() { echo; echo "################ $*"; }
-          bare() { basename "$1"; }
+          LOG=ci-output/battery.txt
+          say() { echo "$@" | tr -d '\r' >> "$LOG"; }
+          note() { say ""; say "################ $*"; }
+          snap() {
+            say "### $1"
+            diskutil info -plist "$2" > "ci-output/plists/$1" 2>&1 || true
+            say "snap $1 done"
+          }
+          checkpoint() {
+            say "---- checkpoint $*"
+            diskutil list 2>&1 | grep -E "^/dev/disk" >> "$LOG" || say "(no disks)"
+          }
 
           note "create a raw sparse image without -fs"
-          sudo hdiutil create -size 4096m -type SPARSE "$WORK/i.dmg"
-          OUT=$(sudo hdiutil attach -nomount "$WORK/i.dmg.sparseimage")
-          echo "$OUT"
-          DEV=$(echo "$OUT" | head -1 | cut -f1)
-          CONT=$(echo "$OUT" | grep -m1 EF57347C | cut -f1)
-          VOL=$(echo "$OUT" | grep -m1 41504653 | cut -f1)
-          DEV=$(bare "$DEV"); CONT=$(bare "$CONT"); VOL=$(bare "$VOL")
-          echo "DEV=$DEV CONT=$CONT VOL=$VOL"
-          diskutil list
+          hdiutil create -size 4096m -type SPARSE "$WORK/i.dmg" 2>&1 | tr -d '\r' >> "$LOG" || true
+          OUT=$(sudo hdiutil attach -nomount "$WORK/i.dmg.sparseimage" 2>&1 || true)
+          say "$OUT"
+          DEV=$(echo "$OUT" | head -1 | awk '{print $1}' | xargs basename)
+          CONT=$(echo "$OUT" | grep -m1 EF57347C | awk '{print $1}' | xargs basename)
+          VOL=$(echo "$OUT" | grep -m1 41504653 | awk '{print $1}' | xargs basename)
+          say "DEV=$DEV CONT=$CONT VOL=$VOL"
+          checkpoint after-attach
 
-          note "apfs addVolume on the container"
-          sudo diskutil apfs addVolume "$CONT" APFS DiagVol
-          diskutil apfs list -plist > ci-output/plists/apfs-list.xml
-          NEW=$(python3 -c '
-          import plistlib, subprocess, sys
-          out = subprocess.run(["diskutil", "apfs", "list", "-plist"], capture_output=True, text=True).stdout
-          for c in plistlib.loads(out.encode()).get("Containers") or []:
-              for v in c.get("Volumes") or []:
-                  if v.get("Name") == "DiagVol":
-                      print(v.get("DeviceIdentifier")); sys.exit(0)
-          ')
-          echo "NEW=$NEW"
-
-          diskutil list -plist > ci-output/plists/list.xml
-          diskutil apfs listVolumeGroups -plist > ci-output/plists/apfs-volume-groups.xml
+          note "read only queries"
+          diskutil list -plist > ci-output/plists/list.xml 2>&1 || true
+          diskutil apfs list -plist > ci-output/plists/apfs-list.xml 2>&1 || true
+          diskutil apfs listVolumeGroups -plist > ci-output/plists/apfs-volume-groups.xml 2>&1 || true
           snap info-whole-disk.xml "$DEV"
-          snap info-store.xml "$DEV"s1
+          snap info-store.xml "${DEV}s2"
           snap info-container-volume.xml "$VOL"
-          snap info-new-volume.xml "$NEW"
-          echo "### diskutil info (text) of the new volume"
-          diskutil info "$NEW"
-          echo "### diskutil listFilesystems"
-          diskutil listFilesystems
-          echo "### diskutil mount"
-          diskutil mount
-          echo "### diskutil apfs (verbs)"
-          diskutil apfs
+          say "### diskutil info (text) of the container volume"
+          diskutil info "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
+          say "### diskutil listFilesystems"
+          diskutil listFilesystems 2>&1 | tr -d '\r' >> "$LOG" || true
 
-          note "ownership"
-          sudo diskutil mount "$VOL"
+          note "ownership needs a mounted volume"
+          sudo diskutil mount "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
           snap info-container-volume-mounted.xml "$VOL"
-          sudo diskutil disableOwnership "$VOL"
+          sudo diskutil disableOwnership "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
           snap info-container-volume-unowned.xml "$VOL"
-          diskutil info "$VOL" | grep -i owners
-          sudo diskutil enableOwnership "$VOL"
+          sudo diskutil enableOwnership "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
           snap info-container-volume-owned.xml "$VOL"
-          diskutil info "$VOL" | grep -i owners
+          checkpoint after-ownership
 
           note "unmount"
-          sudo diskutil unmount "$VOL"
+          sudo diskutil unmount "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
           snap info-container-volume-unmounted.xml "$VOL"
-          echo "### diskutil info (text) of the unmounted volume"
-          diskutil info "$VOL"
-
-          note "rename"
-          sudo diskutil rename "$NEW" DiagVolRenamed
-          diskutil apfs list -plist > ci-output/plists/apfs-list-after-rename.xml
-          snap info-new-volume-renamed.xml "$NEW"
-          diskutil apfs listVolumeGroups -plist > ci-output/plists/apfs-volume-groups-after-rename.xml
-
-          note "eraseVolume"
-          sudo diskutil unmount "$NEW"
-          sudo diskutil eraseVolume APFS DiagErase "$NEW"
-          echo "eraseVolume rc=$?"
-          snap info-new-volume-erased.xml "$NEW"
-          diskutil list -plist > ci-output/plists/list-after-erase-volume.xml
 
           note "eraseVolume of the container volume"
-          sudo diskutil eraseVolume APFS DiagEraseContainer "$VOL"
-          echo "eraseVolume rc=$?"
+          sudo diskutil eraseVolume APFS DiagEraseContainer "$VOL" 2>&1 | tr -d '\r' >> "$LOG" || true
+          say "eraseVolume done"
           snap info-container-volume-erased.xml "$VOL"
-          diskutil list -plist > ci-output/plists/list-after-erase-container-volume.xml
+          diskutil list -plist > ci-output/plists/list-after-erase-volume.xml 2>&1 || true
+          checkpoint after-erase-volume
 
           note "eraseDisk"
-          sudo diskutil eraseDisk APFS DiagEraseDisk GPT "$DEV"
-          echo "eraseDisk rc=$?"
-          diskutil list -plist > ci-output/plists/list-after-erase-disk.xml
-          diskutil apfs list -plist > ci-output/plists/apfs-list-after-erase-disk.xml
+          sudo diskutil eraseDisk APFS DiagEraseDisk GPT "$DEV" 2>&1 | tr -d '\r' >> "$LOG" || true
+          say "eraseDisk done"
+          diskutil list -plist > ci-output/plists/list-after-erase-disk.xml 2>&1 || true
+          diskutil apfs list -plist > ci-output/plists/apfs-list-after-erase-disk.xml 2>&1 || true
+          checkpoint after-erase-disk
+
+          note "apfs addVolume, several ways"
+          for candidate in "$CONT" "${DEV}s2" "$DEV" "/dev/$CONT"; do
+            say "--- addVolume into $candidate"
+            diskutil apfs list | tr -d '\r' | grep -m2 -E "Container Reference|Volume " >> "$LOG" || true
+            sudo diskutil apfs addVolume "$candidate" APFS "DiagVol$(echo "$candidate" | tr -dc 'a-zA-Z0-9')" 2>&1 | tr -d '\r' >> "$LOG" || true
+            checkpoint "after-addVolume-$candidate"
+            diskutil apfs list -plist > "ci-output/plists/apfs-list-after-add-$(echo "$candidate" | tr -dc 'a-zA-Z0-9').xml" 2>&1 || true
+          done
+          diskutil apfs list 2>&1 | tr -d '\r' >> "$LOG" || true
 
           note "detach"
-          sudo hdiutil detach -force "$DEV"
+          sudo hdiutil detach -force "$DEV" 2>&1 | tr -d '\r' >> "$LOG" || true
           rm -rf "$WORK"
         working-directory: ${{ env.COLLECTION_ROOT }}
 
