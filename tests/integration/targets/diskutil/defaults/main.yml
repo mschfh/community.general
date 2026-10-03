@@ -15,3 +15,4 @@ diskutil_test_apfs_volume: DiskutilTestData
 diskutil_test_renamed_volume: DiskutilTestRenamed
 diskutil_test_mount_volume: DiskutilTestMount
 diskutil_test_scratch_volume: DiskutilTestScratch
+diskutil_test_whole_disk_volume: DiskutilTestWholeDisk
