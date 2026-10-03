@@ -90,7 +90,7 @@
 
 - name: Run all read-only queries in check mode
   community.general.diskutil:
-    info_type: "{{ diskutil_test_info_type }}"
+    info_type: "{{ item }}"
     device: "{{ diskutil_test_container_volume }}"
   become: true
   check_mode: true
